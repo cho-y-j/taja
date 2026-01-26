@@ -1,0 +1,233 @@
+@import "tailwindcss";
+
+/* ===== 기본 CSS 변수 ===== */
+:root {
+  /* Junior 테마 (기본) */
+  --color-primary: #6366f1;
+  --color-secondary: #f472b6;
+  --color-accent: #fbbf24;
+  --color-background: #fefce8;
+  --color-surface: #ffffff;
+  --color-text: #1f2937;
+  --color-text-muted: #6b7280;
+  --color-success: #22c55e;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  --color-border: #e5e7eb;
+
+  /* 타이포그래피 */
+  --font-size-xs: 0.875rem;
+  --font-size-sm: 1rem;
+  --font-size-base: 1.125rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.5rem;
+  --font-size-2xl: 2rem;
+  --font-size-3xl: 2.5rem;
+
+  /* 간격 */
+  --spacing-base: 1rem;
+
+  /* 모서리 */
+  --radius-sm: 0.5rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.5rem;
+  --radius-full: 9999px;
+
+  /* 애니메이션 */
+  --animation-duration: 200ms;
+
+  /* 타이핑 영역 */
+  --typing-correct: #22c55e;
+  --typing-error: #ef4444;
+  --typing-current: #6366f1;
+  --typing-pending: #9ca3af;
+}
+
+/* ===== Senior 테마 ===== */
+[data-theme="senior"] {
+  --color-primary: #2563eb;
+  --color-secondary: #64748b;
+  --color-accent: #059669;
+  --color-background: #f8fafc;
+  --color-surface: #ffffff;
+  --color-text: #0f172a;
+  --color-text-muted: #475569;
+  --color-success: #16a34a;
+  --color-error: #dc2626;
+  --color-warning: #d97706;
+  --color-border: #cbd5e1;
+
+  /* 더 큰 폰트 (시니어용) */
+  --font-size-xs: 1rem;
+  --font-size-sm: 1.125rem;
+  --font-size-base: 1.25rem;
+  --font-size-lg: 1.5rem;
+  --font-size-xl: 1.875rem;
+  --font-size-2xl: 2.25rem;
+  --font-size-3xl: 3rem;
+
+  /* 더 넓은 간격 */
+  --spacing-base: 1.25rem;
+
+  /* 더 작은 모서리 (심플) */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+
+  /* 느린 애니메이션 */
+  --animation-duration: 300ms;
+}
+
+/* ===== 모션 감소 ===== */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --animation-duration: 0ms;
+  }
+}
+
+[data-reduced-motion="true"] {
+  --animation-duration: 0ms;
+}
+
+/* ===== Tailwind 테마 ===== */
+@theme inline {
+  --color-primary: var(--color-primary);
+  --color-secondary: var(--color-secondary);
+  --color-accent: var(--color-accent);
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-foreground: var(--color-text);
+  --color-muted: var(--color-text-muted);
+  --color-success: var(--color-success);
+  --color-error: var(--color-error);
+  --color-warning: var(--color-warning);
+  --color-border: var(--color-border);
+
+  --font-sans: "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+}
+
+/* ===== 기본 스타일 ===== */
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+  transition: background-color var(--animation-duration), color var(--animation-duration);
+}
+
+/* ===== 포커스 스타일 (접근성) ===== */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+[data-theme="senior"] *:focus-visible {
+  outline-width: 3px;
+  outline-offset: 3px;
+}
+
+/* ===== 타이핑 영역 스타일 ===== */
+.typing-char {
+  transition: color var(--animation-duration);
+}
+
+.typing-char--correct {
+  color: var(--typing-correct);
+}
+
+.typing-char--error {
+  color: var(--typing-error);
+  text-decoration: underline;
+  text-decoration-style: wavy;
+}
+
+.typing-char--current {
+  color: var(--typing-current);
+  background-color: rgba(99, 102, 241, 0.2);
+  border-radius: 2px;
+}
+
+.typing-char--pending {
+  color: var(--typing-pending);
+}
+
+/* ===== 버튼 기본 스타일 ===== */
+.btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: all var(--animation-duration);
+  cursor: pointer;
+}
+
+[data-theme="senior"] .btn {
+  min-height: 48px;
+  min-width: 48px;
+  padding: 1rem 2rem;
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+/* ===== 키보드 가이드 ===== */
+.keyboard-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0.5rem;
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  transition: all var(--animation-duration);
+}
+
+.keyboard-key--active {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+  transform: scale(1.1);
+}
+
+.keyboard-key--home {
+  border-bottom-width: 4px;
+  border-bottom-color: var(--color-accent);
+}
+
+/* ===== 결과 카드 ===== */
+.result-card {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-base);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* ===== 스크린 리더 전용 ===== */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

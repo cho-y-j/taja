@@ -1,0 +1,57 @@
+{
+  "app": {
+    "name": "LIT-Type",
+    "tagline": "문해력을 키우는 타자 연습"
+  },
+  "nav": {
+    "home": "홈",
+    "practice": "연습",
+    "dashboard": "대시보드",
+    "settings": "설정"
+  },
+  "practice": {
+    "title": "타자 연습",
+    "basics": {
+      "title": "기본 연습",
+      "homeRow": "홈로우 키",
+      "words": "기본 단어"
+    },
+    "sentences": "문장 연습",
+    "listenWrite": "듣고 쓰기",
+    "speak": "보고 말하기",
+    "documents": "문서 연습"
+  },
+  "result": {
+    "wpm": "분당 타수",
+    "accuracy": "정확도",
+    "time": "소요 시간",
+    "errors": "오류 수"
+  },
+  "homeRow": {
+    "title": "홈로우 키 연습",
+    "description": "기본 손가락 위치를 익혀보세요",
+    "leftHand": "왼손",
+    "rightHand": "오른손",
+    "level": "레벨",
+    "start": "연습 시작",
+    "fingerGuide": "손가락 가이드 보기"
+  },
+  "button": {
+    "start": "시작",
+    "stop": "중지",
+    "restart": "다시 시작",
+    "next": "다음",
+    "back": "뒤로",
+    "save": "저장",
+    "cancel": "취소"
+  },
+  "auth": {
+    "signIn": "로그인",
+    "signUp": "회원가입",
+    "signOut": "로그아웃"
+  },
+  "theme": {
+    "junior": "주니어 모드",
+    "senior": "시니어 모드"
+  }
+}

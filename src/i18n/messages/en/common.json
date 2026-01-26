@@ -1,0 +1,57 @@
+{
+  "app": {
+    "name": "LIT-Type",
+    "tagline": "Typing practice for literacy"
+  },
+  "nav": {
+    "home": "Home",
+    "practice": "Practice",
+    "dashboard": "Dashboard",
+    "settings": "Settings"
+  },
+  "practice": {
+    "title": "Typing Practice",
+    "basics": {
+      "title": "Basics",
+      "homeRow": "Home Row",
+      "words": "Basic Words"
+    },
+    "sentences": "Sentences",
+    "listenWrite": "Listen & Write",
+    "speak": "Look & Speak",
+    "documents": "Documents"
+  },
+  "result": {
+    "wpm": "WPM",
+    "accuracy": "Accuracy",
+    "time": "Time",
+    "errors": "Errors"
+  },
+  "homeRow": {
+    "title": "Home Row Practice",
+    "description": "Learn the basic finger positions",
+    "leftHand": "Left Hand",
+    "rightHand": "Right Hand",
+    "level": "Level",
+    "start": "Start Practice",
+    "fingerGuide": "Show Finger Guide"
+  },
+  "button": {
+    "start": "Start",
+    "stop": "Stop",
+    "restart": "Restart",
+    "next": "Next",
+    "back": "Back",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "signOut": "Sign Out"
+  },
+  "theme": {
+    "junior": "Junior Mode",
+    "senior": "Senior Mode"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "app": {
+    "name": "LIT-Type",
+    "tagline": "リテラシーのためのタイピング練習"
+  },
+  "nav": {
+    "home": "ホーム",
+    "practice": "練習",
+    "dashboard": "ダッシュボード",
+    "settings": "設定"
+  },
+  "practice": {
+    "title": "タイピング練習",
+    "basics": {
+      "title": "基礎練習",
+      "homeRow": "ホームポジション",
+      "words": "基本単語"
+    },
+    "sentences": "文章練習",
+    "listenWrite": "聞いて書く",
+    "speak": "見て話す",
+    "documents": "文書練習"
+  },
+  "result": {
+    "wpm": "分速タイプ数",
+    "accuracy": "正確度",
+    "time": "所要時間",
+    "errors": "エラー数"
+  },
+  "homeRow": {
+    "title": "ホームポジション練習",
+    "description": "基本の指の位置を覚えましょう",
+    "leftHand": "左手",
+    "rightHand": "右手",
+    "level": "レベル",
+    "start": "練習開始",
+    "fingerGuide": "指ガイドを表示"
+  },
+  "button": {
+    "start": "開始",
+    "stop": "停止",
+    "restart": "再開",
+    "next": "次へ",
+    "back": "戻る",
+    "save": "保存",
+    "cancel": "キャンセル"
+  },
+  "auth": {
+    "signIn": "ログイン",
+    "signUp": "新規登録",
+    "signOut": "ログアウト"
+  },
+  "theme": {
+    "junior": "ジュニアモード",
+    "senior": "シニアモード"
+  }
+}
