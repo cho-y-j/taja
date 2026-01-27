@@ -73,13 +73,26 @@ export default function SpeakPracticePage() {
   const [showResult, setShowResult] = useState(false);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  // Check if speech recognition is supported
+  // Check if speech recognition is supported & load TTS voices
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
+      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognitionAPI) {
         setSpeechSupported(false);
+      }
+
+      if (window.speechSynthesis) {
+        const loadVoices = () => {
+          const available = window.speechSynthesis.getVoices();
+          if (available.length > 0) setVoices(available);
+        };
+        loadVoices();
+        window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+        return () => {
+          window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+        };
       }
     }
   }, []);
@@ -244,7 +257,7 @@ export default function SpeakPracticePage() {
     setLanguage(prev => prev === 'en' ? 'ko' : 'en');
   }, []);
 
-  // Speak the sentence (TTS)
+  // Speak the sentence (TTS) with natural voice
   const speakSentence = useCallback(() => {
     if (!currentSentence || typeof window === 'undefined' || !window.speechSynthesis) return;
 
@@ -252,8 +265,23 @@ export default function SpeakPracticePage() {
     const utterance = new SpeechSynthesisUtterance(currentSentence.text);
     utterance.lang = language === 'ko' ? 'ko-KR' : 'en-US';
     utterance.rate = 0.9;
+
+    // 자연스러운 음성 선택
+    if (voices.length > 0) {
+      const lang = language === 'ko' ? 'ko' : 'en';
+      const langVoices = voices.filter(v => v.lang.startsWith(lang));
+      const preferredNames = language === 'en'
+        ? ['Google US English', 'Samantha', 'Alex', 'Daniel', 'Karen']
+        : ['Google 한국어', 'Yuna'];
+      const preferred = langVoices.find(v =>
+        preferredNames.some(name => v.name.includes(name))
+      );
+      if (preferred) utterance.voice = preferred;
+      else if (langVoices.length > 0) utterance.voice = langVoices[0];
+    }
+
     window.speechSynthesis.speak(utterance);
-  }, [currentSentence, language]);
+  }, [currentSentence, language, voices]);
 
   const sentences = getSampleSentences(language).filter(s => s.difficulty === difficulty);
 

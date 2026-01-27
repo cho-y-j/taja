@@ -1,7 +1,8 @@
 'use client';
 
 import { cn } from '@/lib/utils/cn';
-import { homeRowKeys, fingerMapping } from '@/lib/typing/home-row';
+import { homeRowKeys } from '@/lib/typing/home-row';
+import { fingerMapping } from '@/lib/typing/keyboard-practice';
 import type { Locale } from '@/types/typing';
 
 interface KeyboardGuideProps {

@@ -128,7 +128,7 @@ export default function HomePage() {
       {/* 푸터 */}
       <footer className="border-t border-[var(--color-border)] py-8 mt-16">
         <div className="container mx-auto px-4 text-center text-[var(--color-text-muted)]">
-          <p>&copy; 2024 LIT-Type. 문해력을 키우는 타자 연습.</p>
+          <p>&copy; 2026 LIT-Type. 문해력을 키우는 타자 연습.</p>
         </div>
       </footer>
     </div>

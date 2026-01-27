@@ -2,19 +2,38 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useTypingStore } from '@/stores/typing-store';
+import { useStatsStore } from '@/stores/stats-store';
 import type { CharacterFeedback, PracticeType } from '@/types/typing';
 
 export function useTypingEngine(targetText: string, practiceType: PracticeType) {
   const store = useTypingStore();
+  const addSession = useStatsStore((s) => s.addSession);
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const savedRef = useRef(false);
 
   // 세션 초기화
   useEffect(() => {
     if (targetText) {
       store.initSession(practiceType, targetText);
+      savedRef.current = false;
     }
   }, [targetText, practiceType]);
+
+  // 완료 시 통계 저장
+  useEffect(() => {
+    if (store.isComplete && !savedRef.current && store.metrics.totalCharacters > 0) {
+      savedRef.current = true;
+      addSession({
+        practiceType,
+        wpm: store.metrics.wpm,
+        accuracy: store.metrics.accuracy,
+        duration: store.metrics.elapsedTime,
+        errorCount: store.metrics.errorCount,
+        totalChars: store.metrics.totalCharacters,
+      });
+    }
+  }, [store.isComplete]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 타이머 - 시작하면 계속 시간 업데이트
   useEffect(() => {
@@ -67,6 +86,7 @@ export function useTypingEngine(targetText: string, practiceType: PracticeType) 
         const isError = store.errors.includes(index);
         return {
           char,
+          userChar: store.userInput[index],
           status: isError ? 'incorrect' : 'correct',
           index,
         };

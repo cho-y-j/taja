@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { TypingDisplay } from '@/components/typing/typing-display';
 import { MetricsDisplay } from '@/components/typing/metrics-display';
 import { useTypingEngine } from '@/hooks/use-typing-engine';
 import { engToKorMap } from '@/lib/typing/korean-keyboard';
@@ -47,13 +46,29 @@ export default function ListenWritePracticePage() {
   const [showHint, setShowHint] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // Check if speech synthesis is supported
+  // Check if speech synthesis is supported & load voices
   useEffect(() => {
-    if (typeof window !== 'undefined' && !window.speechSynthesis) {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
       setSpeechSupported(false);
+      return;
     }
+
+    const loadVoices = () => {
+      const available = window.speechSynthesis.getVoices();
+      if (available.length > 0) {
+        setVoices(available);
+      }
+    };
+
+    loadVoices();
+    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+
+    return () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+    };
   }, []);
 
   const {
@@ -61,7 +76,9 @@ export default function ListenWritePracticePage() {
     isComplete,
     isPaused,
     isStarted,
-    getCharacterFeedback,
+    userInput,
+    currentIndex,
+    errors,
     reset,
     pause,
     resume,
@@ -71,16 +88,41 @@ export default function ListenWritePracticePage() {
     startSession,
   } = useTypingEngine(practiceText, 'listen-write');
 
+  // 자연스러운 음성 선택
+  const getPreferredVoice = useCallback((lang: Language) => {
+    if (voices.length === 0) return undefined;
+
+    if (lang === 'en') {
+      const preferredNames = ['Google US English', 'Samantha', 'Alex', 'Daniel', 'Karen', 'Moira'];
+      const englishVoices = voices.filter(v => v.lang.startsWith('en'));
+      const preferred = englishVoices.find(v =>
+        preferredNames.some(name => v.name.includes(name))
+      );
+      return preferred || englishVoices[0] || undefined;
+    } else {
+      const preferredNames = ['Google 한국어', 'Yuna'];
+      const koreanVoices = voices.filter(v => v.lang.startsWith('ko'));
+      const preferred = koreanVoices.find(v =>
+        preferredNames.some(name => v.name.includes(name))
+      );
+      return preferred || koreanVoices[0] || undefined;
+    }
+  }, [voices]);
+
   // Speak the sentence
   const speakSentence = useCallback(() => {
     if (!currentSentence || !speechSupported || typeof window === 'undefined') return;
 
-    // Cancel any ongoing speech
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(currentSentence.text);
     utterance.lang = language === 'ko' ? 'ko-KR' : 'en-US';
     utterance.rate = difficultyInfo[difficulty].speed;
+
+    const voice = getPreferredVoice(language);
+    if (voice) {
+      utterance.voice = voice;
+    }
 
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
@@ -88,7 +130,7 @@ export default function ListenWritePracticePage() {
 
     speechRef.current = utterance;
     window.speechSynthesis.speak(utterance);
-  }, [currentSentence, language, difficulty, speechSupported]);
+  }, [currentSentence, language, difficulty, speechSupported, getPreferredVoice]);
 
   // Stop speaking
   const stopSpeaking = useCallback(() => {
@@ -120,6 +162,8 @@ export default function ListenWritePracticePage() {
       }
 
       if (e.key.length !== 1) return;
+
+      e.preventDefault();
 
       if (!isStarted) {
         startSession();
@@ -271,9 +315,9 @@ export default function ListenWritePracticePage() {
             </CardHeader>
           </Card>
 
-          {/* 문장 목록 */}
+          {/* 문장 목록 - 미리보기 텍스트 숨김 */}
           <div className="space-y-3 mb-8">
-            {sentences.slice(0, 8).map((sentence) => (
+            {sentences.slice(0, 8).map((sentence, idx) => (
               <Card
                 key={sentence.id}
                 className="cursor-pointer hover:shadow-md transition-shadow"
@@ -282,7 +326,7 @@ export default function ListenWritePracticePage() {
                 <CardContent className="py-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Volume2 className="w-5 h-5 text-[var(--color-primary)]" />
-                    <p className="text-lg">{sentence.text.substring(0, 30)}...</p>
+                    <p className="text-lg">문장 {idx + 1}</p>
                   </div>
                   <ChevronRight className="w-5 h-5 text-[var(--color-text-muted)]" />
                 </CardContent>
@@ -392,29 +436,61 @@ export default function ListenWritePracticePage() {
           </Card>
         )}
 
-        {/* 입력 필드 */}
-        <input
-          ref={inputRef}
-          type="text"
-          className="w-full p-4 mb-4 text-lg border-2 border-[var(--color-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] bg-[var(--color-surface)]"
-          onKeyDown={handleKeyDown}
-          placeholder={language === 'en' ? "Type what you hear..." : "들은 내용을 입력하세요..."}
-          aria-label="받아쓰기 입력"
-          autoFocus
-        />
-
-        {/* 메트릭 표시 */}
-        <MetricsDisplay metrics={metrics} className="mb-6" />
-
-        {/* 타이핑 영역 (진행 상황) */}
-        <div onClick={() => inputRef.current?.focus()} className="cursor-text">
-          <TypingDisplay feedback={getCharacterFeedback()} />
+        {/* 받아쓰기 진행 상황 (정답 숨기기) */}
+        <div onClick={() => inputRef.current?.focus()} className="cursor-text relative mb-6">
+          <input
+            ref={inputRef}
+            type="text"
+            value=""
+            onChange={() => {}}
+            className="absolute opacity-0 w-0 h-0"
+            onKeyDown={handleKeyDown}
+            aria-label="받아쓰기 입력"
+            autoFocus
+          />
+          <div className="font-mono text-2xl leading-relaxed tracking-wide p-6 bg-[var(--color-surface)] rounded-[var(--radius-lg)] border border-[var(--color-border)]">
+            {practiceText.split('').map((targetChar, index) => {
+              if (index < currentIndex) {
+                // 이미 타이핑한 글자: 사용자가 입력한 글자 표시
+                const isError = errors.includes(index);
+                const typedChar = userInput[index] || targetChar;
+                return (
+                  <span
+                    key={index}
+                    className={isError ? 'typing-char typing-char--error' : 'typing-char typing-char--correct'}
+                  >
+                    {typedChar === ' ' ? '\u00A0' : typedChar}
+                  </span>
+                );
+              }
+              if (index === currentIndex) {
+                // 현재 입력 위치: 커서 표시 (글자 숨김)
+                return (
+                  <span key={index} className="typing-char typing-char--current">
+                    {targetChar === ' ' ? '\u00A0' : '●'}
+                  </span>
+                );
+              }
+              // 아직 입력하지 않은 글자: 숨김
+              return (
+                <span key={index} className="typing-char typing-char--pending">
+                  {targetChar === ' ' ? '\u00A0' : '●'}
+                </span>
+              );
+            })}
+          </div>
+          <p className="text-center mt-2 text-sm text-[var(--color-text-muted)]">
+            {currentIndex} / {practiceText.length} 글자
+          </p>
           {!isStarted && (
             <p className="text-center mt-4 text-[var(--color-primary)] animate-pulse">
               {language === 'en' ? 'Listen and start typing' : '들은 내용을 입력하세요'}
             </p>
           )}
         </div>
+
+        {/* 메트릭 표시 */}
+        <MetricsDisplay metrics={metrics} className="mb-6" />
 
         {/* 컨트롤 버튼 */}
         <div className="flex justify-center gap-4 mt-8">
@@ -439,9 +515,27 @@ export default function ListenWritePracticePage() {
               <h3 className="text-2xl font-bold text-green-700 mb-2">
                 완료!
               </h3>
-              <p className="text-green-600 mb-4">
+              <p className="text-green-600 mb-2">
                 정확도 {metrics.accuracy}% | 속도 {metrics.wpm} WPM
               </p>
+
+              {/* 정답 비교 */}
+              <div className="text-left bg-white rounded-lg p-4 mb-4 mt-4">
+                <p className="text-sm text-[var(--color-text-muted)] mb-1">정답:</p>
+                <p className="text-lg mb-3 font-medium">{currentSentence?.text}</p>
+                <p className="text-sm text-[var(--color-text-muted)] mb-1">입력한 내용:</p>
+                <p className="text-lg">
+                  {userInput.split('').map((char, i) => {
+                    const isError = errors.includes(i);
+                    return (
+                      <span key={i} className={isError ? 'text-red-500' : 'text-green-600'}>
+                        {char}
+                      </span>
+                    );
+                  })}
+                </p>
+              </div>
+
               <div className="flex justify-center gap-4">
                 <Button variant="outline" onClick={handleRestart}>
                   다시 연습

@@ -62,6 +62,8 @@ export default function WordPracticePage() {
       // 특수 키 무시
       if (e.key.length !== 1) return;
 
+      e.preventDefault();
+
       // 첫 입력 시 자동 시작
       if (!isStarted) {
         startSession();
@@ -257,29 +259,28 @@ export default function WordPracticePage() {
           </CardHeader>
         </Card>
 
-        {/* 입력 필드 */}
-        <input
-          ref={inputRef}
-          type="text"
-          className="w-full p-4 mb-4 text-lg border-2 border-[var(--color-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] bg-[var(--color-surface)]"
-          onKeyDown={handleKeyDown}
-          placeholder={language === 'en' ? "Click here and start typing..." : "여기를 클릭하고 타이핑을 시작하세요..."}
-          aria-label="타이핑 입력"
-          autoFocus
-        />
-
-        {/* 메트릭 표시 */}
-        <MetricsDisplay metrics={metrics} className="mb-6" />
-
-        {/* 타이핑 영역 */}
-        <div onClick={() => inputRef.current?.focus()} className="cursor-text">
+        {/* 타이핑 영역 (클릭하면 포커스) */}
+        <div onClick={() => inputRef.current?.focus()} className="cursor-text relative mb-6">
+          <input
+            ref={inputRef}
+            type="text"
+            value=""
+            onChange={() => {}}
+            className="absolute opacity-0 w-0 h-0"
+            onKeyDown={handleKeyDown}
+            aria-label="타이핑 입력"
+            autoFocus
+          />
           <TypingDisplay feedback={getCharacterFeedback()} />
           {!isStarted && (
             <p className="text-center mt-4 text-[var(--color-primary)] animate-pulse">
-              {language === 'en' ? 'Click input and start typing' : '위 입력창을 클릭하고 타이핑을 시작하세요'}
+              {language === 'en' ? 'Click here and start typing' : '여기를 클릭하고 타이핑을 시작하세요'}
             </p>
           )}
         </div>
+
+        {/* 메트릭 표시 */}
+        <MetricsDisplay metrics={metrics} className="mb-6" />
 
         {/* 컨트롤 버튼 */}
         <div className="flex justify-center gap-4 mt-8">

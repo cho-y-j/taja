@@ -6,7 +6,8 @@ export type PracticeType =
   | 'sentences'
   | 'listen-write'
   | 'speak'
-  | 'document';
+  | 'document'
+  | 'summary';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -38,6 +39,7 @@ export interface TypingState {
 // 문자 피드백
 export interface CharacterFeedback {
   char: string;
+  userChar?: string;
   status: 'pending' | 'correct' | 'incorrect' | 'current';
   index: number;
 }
