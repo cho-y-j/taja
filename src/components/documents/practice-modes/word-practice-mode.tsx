@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { RotateCcw, ChevronLeft, ChevronRight, Volume2, Eye, EyeOff } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { RotateCcw, ChevronLeft, ChevronRight, Volume2, VolumeX, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { TypingDisplay } from '@/components/typing/typing-display';
 import { TypingInput } from '@/components/typing/typing-input';
 import { useTypingEngine } from '@/hooks/use-typing-engine';
 import { extractWords } from '@/lib/documents/document-utils';
-import { loadVoices, speakText } from '@/lib/speech/tts-utils';
+import { getPreferredVoice } from '@/lib/speech/tts-utils';
 import type { UserDocument } from '@/stores/document-store';
 
 interface Props {
@@ -18,11 +18,41 @@ interface Props {
 export function WordPracticeMode({ document: doc }: Props) {
   const words = useMemo(() => extractWords(doc.content), [doc.content]);
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [autoListen, setAutoListen] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [showTranslation, setShowTranslation] = useState(false);
   const [translation, setTranslation] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
   const currentWord = words[currentIdx] || '';
+
+  // Load voices
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    const loadVoices = () => {
+      const available = window.speechSynthesis.getVoices();
+      if (available.length > 0) {
+        setVoices(available);
+      }
+    };
+
+    loadVoices();
+    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+    return () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+    };
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   const {
     metrics,
@@ -40,18 +70,57 @@ export function WordPracticeMode({ document: doc }: Props) {
   } = useTypingEngine(currentWord, 'words');
 
   useEffect(() => {
-    loadVoices().then(setVoices);
-  }, []);
-
-  useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 100);
   }, [currentIdx, inputRef]);
 
   // Reset translation when word changes
   useEffect(() => {
     setTranslation(null);
-    setShowTranslation(false);
   }, [currentIdx]);
+
+  // Speak function
+  const speakWord = useCallback(() => {
+    if (!currentWord || typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(currentWord);
+    utterance.lang = doc.language === 'ko' ? 'ko-KR' : 'en-US';
+
+    const voice = getPreferredVoice(voices, doc.language);
+    if (voice) {
+      utterance.voice = voice;
+    }
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    speechRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  }, [currentWord, doc.language, voices]);
+
+  // Stop speaking
+  const stopSpeaking = useCallback(() => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  }, []);
+
+  // Auto-listen when word changes
+  useEffect(() => {
+    if (autoListen && currentWord) {
+      speakWord();
+    }
+  }, [currentIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-fetch translation when showTranslation is enabled and word changes
+  useEffect(() => {
+    if (showTranslation && !translation && !isTranslating) {
+      fetchTranslation();
+    }
+  }, [showTranslation, currentIdx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Enter/Space → next word when complete
   useEffect(() => {
@@ -69,16 +138,18 @@ export function WordPracticeMode({ document: doc }: Props) {
     return () => window.removeEventListener('keydown', handler);
   }, [isComplete, currentIdx, words.length, reset]);
 
-  const handleSpeak = useCallback(() => {
-    speakText(currentWord, doc.language, voices);
-  }, [currentWord, doc.language, voices]);
-
-  const handleTranslate = useCallback(async () => {
-    if (translation) {
-      setShowTranslation(!showTranslation);
-      return;
+  // Toggle auto-listen
+  const handleToggleAutoListen = useCallback(() => {
+    if (autoListen) {
+      stopSpeaking();
+      setAutoListen(false);
+    } else {
+      setAutoListen(true);
+      speakWord();
     }
+  }, [autoListen, speakWord, stopSpeaking]);
 
+  const fetchTranslation = useCallback(async () => {
     setIsTranslating(true);
     try {
       const from = doc.language === 'ko' ? 'ko' : 'en';
@@ -91,14 +162,24 @@ export function WordPracticeMode({ document: doc }: Props) {
       if (res.ok) {
         const data = await res.json();
         setTranslation(data.translation);
-        setShowTranslation(true);
       }
     } catch {
       // silently fail
     } finally {
       setIsTranslating(false);
     }
-  }, [currentWord, doc.language, translation, showTranslation]);
+  }, [currentWord, doc.language]);
+
+  const handleTranslate = useCallback(() => {
+    if (!showTranslation) {
+      setShowTranslation(true);
+      if (!translation && !isTranslating) {
+        fetchTranslation();
+      }
+    } else {
+      setShowTranslation(false);
+    }
+  }, [showTranslation, translation, isTranslating, fetchTranslation]);
 
   const handleRestart = useCallback(() => {
     reset();
@@ -137,11 +218,19 @@ export function WordPracticeMode({ document: doc }: Props) {
           단어 {currentIdx + 1} / {words.length}
         </p>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleSpeak}>
-            <Volume2 className="w-4 h-4" />
+          <Button
+            variant={autoListen ? 'primary' : 'outline'}
+            size="sm"
+            onClick={handleToggleAutoListen}
+          >
+            {isSpeaking ? (
+              <VolumeX className="w-4 h-4" />
+            ) : (
+              <Volume2 className="w-4 h-4" />
+            )}
           </Button>
           <Button
-            variant="outline"
+            variant={showTranslation ? 'primary' : 'outline'}
             size="sm"
             onClick={handleTranslate}
             disabled={isTranslating}

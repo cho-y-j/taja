@@ -50,7 +50,7 @@ export function extractSentences(content: string): string[] {
  */
 export function extractParagraphs(
   content: string,
-  maxLength: number = 150
+  maxLength: number = 120
 ): string[] {
   return content
     .split(/\n\n+/)

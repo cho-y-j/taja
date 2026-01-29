@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useTypingStore } from '@/stores/typing-store';
 import { useStatsStore } from '@/stores/stats-store';
+import { playErrorSound, playKeySound } from '@/lib/utils/sound';
 import type { CharacterFeedback, PracticeType } from '@/types/typing';
 
 export function useTypingEngine(targetText: string, practiceType: PracticeType) {
@@ -55,28 +56,18 @@ export function useTypingEngine(targetText: string, practiceType: PracticeType) 
     };
   }, [store.isStarted, store.isComplete, store.isPaused]);
 
-  // 키 입력 핸들러
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (store.isComplete || store.isPaused) return;
-
-      // 특수 키 무시
-      if (e.key.length !== 1 && e.key !== 'Backspace') return;
-
-      // Backspace는 현재 지원하지 않음
-      if (e.key === 'Backspace') {
-        e.preventDefault();
-        return;
+  // processInput with sound effects — this is what all components actually call
+  const processInputWithSound = useCallback(
+    (char: string) => {
+      const expected = store.targetText[store.currentIndex];
+      if (char !== expected) {
+        playErrorSound();
+      } else {
+        playKeySound();
       }
-
-      // 첫 입력 시 자동으로 세션 시작
-      if (!store.isStarted) {
-        store.startSession();
-      }
-
-      store.processInput(e.key);
+      store.processInput(char);
     },
-    [store.isComplete, store.isPaused, store.isStarted]
+    [store.targetText, store.currentIndex]
   );
 
   // 문자별 피드백 생성
@@ -111,8 +102,9 @@ export function useTypingEngine(targetText: string, practiceType: PracticeType) 
 
   return {
     ...store,
+    processInput: processInputWithSound,
     inputRef,
-    handleKeyDown,
+    handleKeyDown: () => {}, // deprecated — sound is now in processInput
     getCharacterFeedback,
     getNextKey,
     focusInput,

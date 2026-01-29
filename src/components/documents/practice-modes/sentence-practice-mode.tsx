@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { RotateCcw, ChevronLeft, ChevronRight, Volume2 } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { RotateCcw, ChevronLeft, ChevronRight, Volume2, VolumeX, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { TypingDisplay } from '@/components/typing/typing-display';
@@ -9,7 +9,7 @@ import { MetricsDisplay } from '@/components/typing/metrics-display';
 import { TypingInput } from '@/components/typing/typing-input';
 import { useTypingEngine } from '@/hooks/use-typing-engine';
 import { extractSentences } from '@/lib/documents/document-utils';
-import { loadVoices, speakText } from '@/lib/speech/tts-utils';
+import { getPreferredVoice } from '@/lib/speech/tts-utils';
 import type { UserDocument } from '@/stores/document-store';
 
 interface Props {
@@ -19,8 +19,41 @@ interface Props {
 export function SentencePracticeMode({ document: doc }: Props) {
   const sentences = useMemo(() => extractSentences(doc.content), [doc.content]);
   const [currentIdx, setCurrentIdx] = useState(0);
+  const [autoListen, setAutoListen] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [showTranslation, setShowTranslation] = useState(false);
+  const [translation, setTranslation] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
   const practiceText = sentences[currentIdx] || '';
+
+  // Load voices
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    const loadVoices = () => {
+      const available = window.speechSynthesis.getVoices();
+      if (available.length > 0) {
+        setVoices(available);
+      }
+    };
+
+    loadVoices();
+    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+    return () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+    };
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   const {
     metrics,
@@ -38,12 +71,57 @@ export function SentencePracticeMode({ document: doc }: Props) {
   } = useTypingEngine(practiceText, 'sentences');
 
   useEffect(() => {
-    loadVoices().then(setVoices);
-  }, []);
-
-  useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 100);
   }, [currentIdx, inputRef]);
+
+  // Reset translation when sentence changes
+  useEffect(() => {
+    setTranslation(null);
+  }, [currentIdx]);
+
+  // Speak function
+  const speakSentence = useCallback(() => {
+    if (!practiceText || typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(practiceText);
+    utterance.lang = doc.language === 'ko' ? 'ko-KR' : 'en-US';
+
+    const voice = getPreferredVoice(voices, doc.language);
+    if (voice) {
+      utterance.voice = voice;
+    }
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    speechRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  }, [practiceText, doc.language, voices]);
+
+  // Stop speaking
+  const stopSpeaking = useCallback(() => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  }, []);
+
+  // Auto-listen when sentence changes
+  useEffect(() => {
+    if (autoListen && practiceText) {
+      speakSentence();
+    }
+  }, [currentIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-fetch translation when sentence changes and showTranslation is ON
+  useEffect(() => {
+    if (showTranslation && !translation && !isTranslating) {
+      fetchTranslation();
+    }
+  }, [currentIdx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRestart = useCallback(() => {
     reset();
@@ -80,9 +158,48 @@ export function SentencePracticeMode({ document: doc }: Props) {
     return () => window.removeEventListener('keydown', handler);
   }, [isComplete, currentIdx, sentences.length, reset]);
 
-  const handleSpeak = useCallback(() => {
-    speakText(practiceText, doc.language, voices);
-  }, [practiceText, doc.language, voices]);
+  // Toggle auto-listen
+  const handleToggleAutoListen = useCallback(() => {
+    if (autoListen) {
+      stopSpeaking();
+      setAutoListen(false);
+    } else {
+      setAutoListen(true);
+      speakSentence();
+    }
+  }, [autoListen, speakSentence, stopSpeaking]);
+
+  const fetchTranslation = useCallback(async () => {
+    setIsTranslating(true);
+    try {
+      const from = doc.language === 'ko' ? 'ko' : 'en';
+      const to = doc.language === 'ko' ? 'en' : 'ko';
+      const res = await fetch('/api/ai/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: practiceText, from, to }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTranslation(data.translation);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setIsTranslating(false);
+    }
+  }, [practiceText, doc.language]);
+
+  const handleTranslate = useCallback(() => {
+    if (!showTranslation) {
+      setShowTranslation(true);
+      if (!translation && !isTranslating) {
+        fetchTranslation();
+      }
+    } else {
+      setShowTranslation(false);
+    }
+  }, [showTranslation, translation, isTranslating, fetchTranslation]);
 
   if (sentences.length === 0) {
     return (
@@ -101,8 +218,28 @@ export function SentencePracticeMode({ document: doc }: Props) {
           문장 {currentIdx + 1} / {sentences.length}
         </p>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleSpeak}>
-            <Volume2 className="w-4 h-4" />
+          <Button
+            variant={autoListen ? 'primary' : 'outline'}
+            size="sm"
+            onClick={handleToggleAutoListen}
+          >
+            {isSpeaking ? (
+              <VolumeX className="w-4 h-4" />
+            ) : (
+              <Volume2 className="w-4 h-4" />
+            )}
+          </Button>
+          <Button
+            variant={showTranslation ? 'primary' : 'outline'}
+            size="sm"
+            onClick={handleTranslate}
+            disabled={isTranslating}
+          >
+            {showTranslation ? (
+              <EyeOff className="w-4 h-4" />
+            ) : (
+              <Eye className="w-4 h-4" />
+            )}
           </Button>
           <Button variant="outline" size="sm" onClick={handlePrev} disabled={currentIdx === 0}>
             <ChevronLeft className="w-4 h-4" />
@@ -112,6 +249,15 @@ export function SentencePracticeMode({ document: doc }: Props) {
           </Button>
         </div>
       </div>
+
+      {/* 번역 표시 */}
+      {showTranslation && translation && (
+        <div className="text-center mb-4">
+          <span className="inline-block px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-lg font-medium">
+            {translation}
+          </span>
+        </div>
+      )}
 
       <div onClick={() => inputRef.current?.focus()} className="cursor-text relative mb-6">
         <TypingInput

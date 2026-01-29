@@ -1,6 +1,7 @@
 // 테마 관련 타입 정의
 
 export type ThemeMode = 'junior' | 'senior';
+export type Language = 'en' | 'ko';
 
 export interface ThemeColors {
   primary: string;

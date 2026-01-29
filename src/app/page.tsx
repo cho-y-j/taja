@@ -1,135 +1,133 @@
 'use client';
 
-import Link from 'next/link';
-import { Keyboard, BookOpen, Headphones, Mic, FileText, BarChart3 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Keyboard, Settings } from 'lucide-react';
 import { useThemeStore } from '@/stores/theme-store';
-
-const practiceOptions = [
-  {
-    title: '홈로우 키 연습',
-    description: '기본 손가락 위치를 익혀보세요',
-    icon: Keyboard,
-    href: '/practice/basics/home-row',
-    color: 'bg-blue-500',
-  },
-  {
-    title: '기본 단어 연습',
-    description: '자주 사용하는 단어로 연습해요',
-    icon: BookOpen,
-    href: '/practice/basics/words',
-    color: 'bg-green-500',
-  },
-  {
-    title: '문장 연습',
-    description: '다양한 문장을 타이핑해보세요',
-    icon: FileText,
-    href: '/practice/sentences',
-    color: 'bg-purple-500',
-  },
-  {
-    title: '듣고 쓰기',
-    description: '들려주는 문장을 받아쓰기',
-    icon: Headphones,
-    href: '/practice/listen-write',
-    color: 'bg-orange-500',
-  },
-  {
-    title: '보고 말하기',
-    description: '화면의 문장을 읽어보세요',
-    icon: Mic,
-    href: '/practice/speak',
-    color: 'bg-pink-500',
-  },
-  {
-    title: '문서 연습',
-    description: '내 문서로 타자 연습하기',
-    icon: FileText,
-    href: '/documents',
-    color: 'bg-teal-500',
-  },
-];
+import type { Language } from '@/types/theme';
 
 export default function HomePage() {
-  const { mode, toggleMode } = useThemeStore();
+  const router = useRouter();
+  const { mode, language, setLanguage, toggleMode } = useThemeStore();
+
+  // 이미 언어를 선택했다면 learn 페이지로 리다이렉트
+  useEffect(() => {
+    if (language) {
+      router.push('/learn');
+    }
+  }, [language, router]);
+
+  const handleLanguageSelect = (lang: Language) => {
+    setLanguage(lang);
+    router.push('/learn');
+  };
+
+  // 언어가 이미 선택되어 있으면 로딩 표시
+  if (language) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)]">
+        <div className="spinner" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[var(--color-background)] flex flex-col">
       {/* 헤더 */}
-      <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Keyboard className="w-8 h-8 text-[var(--color-primary)]" />
-            <h1 className="text-2xl font-bold text-[var(--color-text)]">LIT-Type</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={toggleMode}
-            >
-              {mode === 'junior' ? '시니어 모드' : '주니어 모드'}로 전환
-            </Button>
-            <Link href="/dashboard">
-              <Button variant="ghost" size="sm">
-                <BarChart3 className="w-4 h-4 mr-2" />
-                대시보드
-              </Button>
-            </Link>
-          </div>
-        </div>
+      <header className="p-4 flex justify-end">
+        <button
+          onClick={toggleMode}
+          className="icon-btn"
+          aria-label="테마 변경"
+        >
+          <Settings className="w-5 h-5" />
+        </button>
       </header>
 
       {/* 메인 콘텐츠 */}
-      <main className="container mx-auto px-4 py-12">
-        {/* 히어로 섹션 */}
-        <section className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-[var(--color-text)] mb-4">
-            문해력을 키우는
-            <br />
-            <span className="text-[var(--color-primary)]">타자 연습</span>
-          </h2>
-          <p className="text-xl text-[var(--color-text-muted)] max-w-2xl mx-auto">
-            홈로우 키부터 시작해서 문장, 듣고쓰기, 보고말하기까지.
-            <br />
-            재미있게 타자 실력을 키워보세요!
+      <main className="flex-1 flex flex-col items-center justify-center px-6 pb-12">
+        {/* 로고 & 타이틀 */}
+        <div className="text-center mb-12 animate-fade-in">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[var(--gradient-primary)] mb-6 shadow-lg" style={{ background: 'var(--gradient-primary)' }}>
+            <Keyboard className="w-10 h-10 text-white" />
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold text-[var(--color-text)] mb-3">
+            TAJA
+          </h1>
+          <p className="text-lg md:text-xl text-[var(--color-text-muted)]">
+            타자 연습 마스터
           </p>
-        </section>
+        </div>
 
-        {/* 연습 옵션 그리드 */}
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {practiceOptions.map((option) => (
-            <Link key={option.href} href={option.href}>
-              <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer group">
-                <CardContent className="pt-6">
-                  <div className={`w-12 h-12 rounded-xl ${option.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                    <option.icon className="w-6 h-6 text-white" />
-                  </div>
-                  <CardTitle className="mb-2">{option.title}</CardTitle>
-                  <CardDescription>{option.description}</CardDescription>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </section>
+        {/* 연습 언어 선택 */}
+        <div className="w-full max-w-lg mb-12">
+          <p className="text-center text-[var(--color-text-muted)] mb-6 text-lg">
+            어떤 언어로 연습할까요?
+          </p>
 
-        {/* 빠른 시작 */}
-        <section className="text-center mt-16">
-          <p className="text-[var(--color-text-muted)] mb-4">처음이신가요?</p>
-          <Link href="/practice/basics/home-row">
-            <Button size="lg" className="text-lg px-8">
-              홈로우 키부터 시작하기
-            </Button>
-          </Link>
-        </section>
+          <div className="grid grid-cols-2 gap-6">
+            {/* 영어 */}
+            <button
+              onClick={() => handleLanguageSelect('en')}
+              className="language-card text-center animate-slide-up"
+              style={{ animationDelay: '0.1s' }}
+            >
+              <div className="text-5xl mb-4">🇺🇸</div>
+              <h2 className="text-xl font-bold text-[var(--color-text)] mb-1">
+                영문 타자
+              </h2>
+              <p className="text-sm text-[var(--color-text-muted)]">
+                영어 키보드 연습
+              </p>
+            </button>
+
+            {/* 한글 */}
+            <button
+              onClick={() => handleLanguageSelect('ko')}
+              className="language-card text-center animate-slide-up"
+              style={{ animationDelay: '0.2s' }}
+            >
+              <div className="text-5xl mb-4">🇰🇷</div>
+              <h2 className="text-xl font-bold text-[var(--color-text)] mb-1">
+                한글 타자
+              </h2>
+              <p className="text-sm text-[var(--color-text-muted)]">
+                한글 키보드 연습
+              </p>
+            </button>
+          </div>
+        </div>
+
+        {/* 모드 선택 */}
+        <div className="text-center animate-fade-in" style={{ animationDelay: '0.3s' }}>
+          <p className="text-sm text-[var(--color-text-muted)] mb-3">현재 모드</p>
+          <div className="mode-tabs inline-flex">
+            <button
+              onClick={() => mode !== 'junior' && toggleMode()}
+              className={`mode-tab ${mode === 'junior' ? 'mode-tab-active' : ''}`}
+            >
+              주니어
+            </button>
+            <button
+              onClick={() => mode !== 'senior' && toggleMode()}
+              className={`mode-tab ${mode === 'senior' ? 'mode-tab-active' : ''}`}
+            >
+              시니어
+            </button>
+          </div>
+          <p className="text-xs text-[var(--color-text-light)] mt-2">
+            {mode === 'junior'
+              ? '밝고 활기찬 디자인'
+              : '차분하고 큰 글씨'}
+          </p>
+        </div>
       </main>
 
       {/* 푸터 */}
-      <footer className="border-t border-[var(--color-border)] py-8 mt-16">
-        <div className="container mx-auto px-4 text-center text-[var(--color-text-muted)]">
-          <p>&copy; 2026 LIT-Type. 문해력을 키우는 타자 연습.</p>
-        </div>
+      <footer className="py-6 text-center">
+        <p className="text-sm text-[var(--color-text-light)]">
+          &copy; 2026 TAJA. 문해력을 키우는 타자 연습.
+        </p>
       </footer>
     </div>
   );

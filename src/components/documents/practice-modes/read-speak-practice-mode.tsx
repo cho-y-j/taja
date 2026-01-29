@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { extractSentences, extractWords } from '@/lib/documents/document-utils';
-import { loadVoices, speakText } from '@/lib/speech/tts-utils';
+import { loadVoices, speakText, getPreferredVoice } from '@/lib/speech/tts-utils';
 import type { UserDocument } from '@/stores/document-store';
 
 type SpeakMode = 'words' | 'sentences';
@@ -99,7 +99,8 @@ export function ReadSpeakPracticeMode({ document: doc }: Props) {
   }, []);
 
   const handleSpeak = useCallback(() => {
-    speakText(currentItem, doc.language, voices);
+    const voice = getPreferredVoice(voices, doc.language);
+    speakText(currentItem, doc.language, { voice });
   }, [currentItem, doc.language, voices]);
 
   const handleTranslate = useCallback(async () => {

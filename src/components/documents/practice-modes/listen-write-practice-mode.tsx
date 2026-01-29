@@ -16,7 +16,7 @@ import { MetricsDisplay } from '@/components/typing/metrics-display';
 import { useTypingEngine } from '@/hooks/use-typing-engine';
 import { TypingInput } from '@/components/typing/typing-input';
 import { extractSentences, extractWords } from '@/lib/documents/document-utils';
-import { loadVoices, speakText } from '@/lib/speech/tts-utils';
+import { loadVoices, speakText, getPreferredVoice } from '@/lib/speech/tts-utils';
 import type { UserDocument } from '@/stores/document-store';
 
 type ListenMode = 'words' | 'sentences';
@@ -101,7 +101,9 @@ export function ListenWritePracticeMode({ document: doc }: Props) {
       setIsSpeaking(false);
       return;
     }
-    speakText(practiceText, doc.language, voices, {
+    const voice = getPreferredVoice(voices, doc.language);
+    speakText(practiceText, doc.language, {
+      voice,
       rate: listenMode === 'words' ? 0.8 : 0.9,
       onStart: () => setIsSpeaking(true),
       onEnd: () => setIsSpeaking(false),

@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
 import { useDocumentStore, type PracticeMode } from '@/stores/document-store';
-import { loadVoices, speakText } from '@/lib/speech/tts-utils';
+import { loadVoices, speakText, getPreferredVoice } from '@/lib/speech/tts-utils';
 
 interface PracticeModeOption {
   mode: PracticeMode;
@@ -103,7 +103,9 @@ export function DocumentDetailView() {
       setIsSpeaking(false);
       return;
     }
-    speakText(doc.content, doc.language, voices, {
+    const voice = getPreferredVoice(voices, doc.language);
+    speakText(doc.content, doc.language, {
+      voice,
       onStart: () => setIsSpeaking(true),
       onEnd: () => setIsSpeaking(false),
     });
