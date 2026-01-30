@@ -14,6 +14,10 @@ import {
   Trophy,
   Home,
   ChevronRight,
+  Volume2,
+  VolumeX,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -69,6 +73,23 @@ export default function SentencePracticePage() {
   const isFinishedRef = useRef(false);
   const isComposingRef = useRef(false); // 한글 IME 조합 중인지
 
+  // TTS & 번역
+  const [autoListen, setAutoListen] = useState(false);
+  const [showTranslation, setShowTranslation] = useState(false);
+
+  // 현재 문장 번역
+  const currentTranslation = sentences[currentSentenceIndex]?.translation || '';
+
+  // TTS 함수
+  const speakSentence = useCallback((text: string) => {
+    if (!text || typeof window === 'undefined' || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = language === 'ko' ? 'ko-KR' : 'en-US';
+    utterance.rate = 0.9;
+    window.speechSynthesis.speak(utterance);
+  }, [language]);
+
   // 카테고리별 문장 목록 가져오기 및 섞기
   const loadSentences = useCallback((category: string) => {
     const categoryData = getSentencesByCategory(language, category);
@@ -80,6 +101,13 @@ export default function SentencePracticePage() {
       setCurrentText(shuffled[0].text);
     }
   }, [language]);
+
+  // 자동 읽기 - 문장이 바뀌면 읽기
+  useEffect(() => {
+    if (autoListen && currentText && viewMode === 'practice') {
+      speakSentence(currentText);
+    }
+  }, [autoListen, currentText, viewMode, speakSentence]);
 
   // 카테고리 선택
   const handleCategorySelect = useCallback((categoryId: string) => {
@@ -557,7 +585,7 @@ export default function SentencePracticePage() {
           <Card className="mb-4">
             <CardContent className="py-6">
               {/* 문장 표시 */}
-              <div className="text-2xl leading-relaxed mb-6 font-mono tracking-wide min-h-[80px]">
+              <div className="text-2xl leading-relaxed mb-2 font-mono tracking-wide min-h-[80px]">
                 {feedback.map((item, index) => (
                   <span
                     key={index}
@@ -575,6 +603,13 @@ export default function SentencePracticePage() {
                   </span>
                 ))}
               </div>
+
+              {/* 해석 표시 */}
+              {showTranslation && currentTranslation && (
+                <div className="text-center mb-4 text-[var(--color-text-muted)] text-sm">
+                  ({currentTranslation})
+                </div>
+              )}
 
               {/* 입력 필드 */}
               <input
@@ -594,10 +629,31 @@ export default function SentencePracticePage() {
             </CardContent>
           </Card>
 
-          {/* 힌트 */}
-          <p className="text-center text-[var(--color-text-muted)] text-sm">
-            문장을 완성하면 자동으로 다음 문장이 나옵니다
-          </p>
+          {/* 컨트롤 버튼 */}
+          <div className="flex justify-center gap-3 flex-wrap">
+            <Button variant="outline" size="sm" onClick={togglePause}>
+              {isPaused ? <Play className="w-4 h-4 mr-1" /> : <Pause className="w-4 h-4 mr-1" />}
+              {isPaused ? '계속' : '일시정지'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setAutoListen(!autoListen); if (!autoListen && currentText) speakSentence(currentText); }}
+              className={autoListen ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600' : ''}
+            >
+              {autoListen ? <VolumeX className="w-4 h-4 mr-1" /> : <Volume2 className="w-4 h-4 mr-1" />}
+              {autoListen ? '음성 끄기' : '음성 듣기'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowTranslation(!showTranslation)}
+              className={showTranslation ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600' : ''}
+            >
+              {showTranslation ? <EyeOff className="w-4 h-4 mr-1" /> : <Eye className="w-4 h-4 mr-1" />}
+              {showTranslation ? '해석 숨기기' : '해석 보기'}
+            </Button>
+          </div>
         </main>
       </div>
     );

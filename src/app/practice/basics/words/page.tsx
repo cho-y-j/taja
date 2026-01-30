@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, RotateCcw, Play, Home, X, Globe, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Play, Home, X, Globe, Eye, EyeOff, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { MetricsDisplay } from '@/components/typing/metrics-display';
@@ -20,8 +20,19 @@ export default function WordPracticePage() {
   const [showLevelSelect, setShowLevelSelect] = useState(true);
   const [wordsWithMeaning, setWordsWithMeaning] = useState<WordWithMeaning[]>([]);
   const [showTranslation, setShowTranslation] = useState(false);
+  const [autoListen, setAutoListen] = useState(false);
 
   const currentLevelData = wordLevels[currentLevel - 1];
+
+  // TTS 함수
+  const speakWord = useCallback((word: string) => {
+    if (!word || typeof window === 'undefined' || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(word);
+    utterance.lang = language === 'ko' ? 'ko-KR' : 'en-US';
+    utterance.rate = 0.9;
+    window.speechSynthesis.speak(utterance);
+  }, [language]);
 
   // 연습 텍스트 생성
   useEffect(() => {
@@ -55,6 +66,14 @@ export default function WordPracticePage() {
   }, [practiceText, userInput, wordsWithMeaning.length]);
 
   const currentMeaning = wordsWithMeaning[currentWordIndex]?.meaning || '';
+  const currentWord = wordsWithMeaning[currentWordIndex]?.word || '';
+
+  // 자동 읽기 - 현재 단어가 바뀌면 읽기
+  useEffect(() => {
+    if (autoListen && currentWord && !showLevelSelect) {
+      speakWord(currentWord);
+    }
+  }, [autoListen, currentWord, showLevelSelect, speakWord]);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const isComposingRef = useRef(false);
@@ -342,6 +361,14 @@ export default function WordPracticePage() {
               {isPaused ? '계속' : '일시정지'}
             </Button>
           )}
+          <Button
+            variant="outline"
+            onClick={() => { setAutoListen(!autoListen); if (!autoListen && currentWord) speakWord(currentWord); }}
+            className={autoListen ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600' : ''}
+          >
+            {autoListen ? <VolumeX className="w-4 h-4 mr-2" /> : <Volume2 className="w-4 h-4 mr-2" />}
+            {autoListen ? '음성 끄기' : '음성 듣기'}
+          </Button>
           <Button
             variant="outline"
             onClick={() => setShowTranslation(!showTranslation)}
