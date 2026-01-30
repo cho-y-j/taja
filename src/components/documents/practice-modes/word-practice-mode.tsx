@@ -168,10 +168,26 @@ export function WordPracticeMode({ document: doc }: Props) {
   // Fetch translation for word
   const fetchTranslation = useCallback(async (word: string) => {
     if (!word) return;
-    // For now, just show opposite language hint
-    // Could be enhanced with actual translation API later
-    const targetLang = doc.language === 'en' ? 'ko' : 'en';
-    setTranslation(`(${targetLang === 'ko' ? '한글 해석' : 'English meaning'})`);
+    setTranslation('번역 중...');
+    try {
+      const response = await fetch('/api/ai/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: word,
+          from: doc.language,
+          to: doc.language === 'en' ? 'ko' : 'en',
+        }),
+      });
+      const data = await response.json();
+      if (data.translation) {
+        setTranslation(data.translation);
+      } else {
+        setTranslation('번역 실패');
+      }
+    } catch {
+      setTranslation('번역 오류');
+    }
   }, [doc.language]);
 
   // Move to next word

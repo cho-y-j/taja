@@ -169,8 +169,26 @@ export function SentencePracticeMode({ document: doc }: Props) {
   // Fetch translation for sentence
   const fetchTranslation = useCallback(async (text: string) => {
     if (!text) return;
-    const targetLang = doc.language === 'en' ? 'ko' : 'en';
-    setTranslation(`(${targetLang === 'ko' ? '한글 해석' : 'English translation'})`);
+    setTranslation('번역 중...');
+    try {
+      const response = await fetch('/api/ai/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: text,
+          from: doc.language,
+          to: doc.language === 'en' ? 'ko' : 'en',
+        }),
+      });
+      const data = await response.json();
+      if (data.translation) {
+        setTranslation(data.translation);
+      } else {
+        setTranslation('번역 실패');
+      }
+    } catch {
+      setTranslation('번역 오류');
+    }
   }, [doc.language]);
 
   // Move to next sentence
