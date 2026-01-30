@@ -1,8 +1,8 @@
-// 한글 키보드 레이아웃 (두벌식)
+// 한글 키보드 레이아웃 (두벌식) - 실제 키보드 배열
 export const koreanKeyboardRows = {
-  home: ['ㅁ', 'ㄴ', 'ㅇ', 'ㄹ', 'ㅎ', 'ㅗ', 'ㅏ', 'ㅣ'],
-  top: ['ㅂ', 'ㅈ', 'ㄷ', 'ㄱ', 'ㅅ', 'ㅛ', 'ㅕ', 'ㅑ', 'ㅐ', 'ㅔ'],
-  bottom: ['ㅋ', 'ㅌ', 'ㅊ', 'ㅍ', 'ㅠ', 'ㅜ', 'ㅡ'],
+  home: ['ㅁ', 'ㄴ', 'ㅇ', 'ㄹ', 'ㅎ', 'ㅗ', 'ㅓ', 'ㅏ', 'ㅣ'],  // a s d f g h j k l
+  top: ['ㅂ', 'ㅈ', 'ㄷ', 'ㄱ', 'ㅅ', 'ㅛ', 'ㅕ', 'ㅑ', 'ㅐ', 'ㅔ'],  // q w e r t y u i o p
+  bottom: ['ㅋ', 'ㅌ', 'ㅊ', 'ㅍ', 'ㅠ', 'ㅜ', 'ㅡ'],  // z x c v b n m
 };
 
 // 전체 한글 키
@@ -19,11 +19,11 @@ export interface KoreanPracticeLevel {
 // 한글 행별 레벨 정의
 export const koreanRowLevels = {
   home: [
-    { level: 1, keys: ['ㄹ', 'ㅎ'], targetAccuracy: 90, description: 'Index: ㄹ and ㅎ', descriptionKo: '검지: ㄹ과 ㅎ' },
-    { level: 2, keys: ['ㄹ', 'ㅎ', 'ㅇ', 'ㅗ'], targetAccuracy: 90, description: 'Add middle: ㅇ and ㅗ', descriptionKo: '중지 추가: ㅇ과 ㅗ' },
-    { level: 3, keys: ['ㄹ', 'ㅎ', 'ㅇ', 'ㅗ', 'ㄴ', 'ㅏ'], targetAccuracy: 85, description: 'Add ring: ㄴ and ㅏ', descriptionKo: '약지 추가: ㄴ과 ㅏ' },
-    { level: 4, keys: ['ㅁ', 'ㄴ', 'ㅇ', 'ㄹ', 'ㅎ', 'ㅗ', 'ㅏ', 'ㅣ'], targetAccuracy: 85, description: 'Complete home row', descriptionKo: '홈로우 완성' },
-    { level: 5, keys: ['ㅁ', 'ㄴ', 'ㅇ', 'ㄹ', ' ', 'ㅎ', 'ㅗ', 'ㅏ', 'ㅣ'], targetAccuracy: 80, description: 'Add space', descriptionKo: '스페이스 추가' },
+    { level: 1, keys: ['ㄹ', 'ㅎ', 'ㅗ', 'ㅓ'], targetAccuracy: 90, description: 'Index: ㄹ ㅎ ㅗ ㅓ', descriptionKo: '검지: ㄹ ㅎ ㅗ ㅓ' },
+    { level: 2, keys: ['ㄹ', 'ㅎ', 'ㅗ', 'ㅓ', 'ㅇ', 'ㅏ'], targetAccuracy: 90, description: 'Add middle: ㅇ ㅏ', descriptionKo: '중지 추가: ㅇ ㅏ' },
+    { level: 3, keys: ['ㄹ', 'ㅎ', 'ㅗ', 'ㅓ', 'ㅇ', 'ㅏ', 'ㄴ', 'ㅣ'], targetAccuracy: 85, description: 'Add ring: ㄴ ㅣ', descriptionKo: '약지 추가: ㄴ ㅣ' },
+    { level: 4, keys: ['ㅁ', 'ㄴ', 'ㅇ', 'ㄹ', 'ㅎ', 'ㅗ', 'ㅓ', 'ㅏ', 'ㅣ'], targetAccuracy: 85, description: 'Complete home row', descriptionKo: '홈로우 완성' },
+    { level: 5, keys: ['ㅁ', 'ㄴ', 'ㅇ', 'ㄹ', ' ', 'ㅎ', 'ㅗ', 'ㅓ', 'ㅏ', 'ㅣ'], targetAccuracy: 80, description: 'Add space', descriptionKo: '스페이스 추가' },
   ],
   top: [
     { level: 1, keys: ['ㄱ', 'ㅕ'], targetAccuracy: 90, description: 'Index: ㄱ and ㅕ', descriptionKo: '검지: ㄱ과 ㅕ' },
@@ -56,12 +56,12 @@ export const koreanRowNames = {
   all: '전체 연습',
 };
 
-// 한글 키보드 레이아웃 (영문 키 -> 한글 키 매핑)
+// 한글 키보드 레이아웃 (영문 키 -> 한글 키 매핑) - 실제 두벌식 배열
 export const engToKorMap: Record<string, string> = {
   'q': 'ㅂ', 'w': 'ㅈ', 'e': 'ㄷ', 'r': 'ㄱ', 't': 'ㅅ',
   'y': 'ㅛ', 'u': 'ㅕ', 'i': 'ㅑ', 'o': 'ㅐ', 'p': 'ㅔ',
   'a': 'ㅁ', 's': 'ㄴ', 'd': 'ㅇ', 'f': 'ㄹ', 'g': 'ㅎ',
-  'h': 'ㅗ', 'j': 'ㅏ', 'k': 'ㅣ', 'l': 'ㅣ',
+  'h': 'ㅗ', 'j': 'ㅓ', 'k': 'ㅏ', 'l': 'ㅣ',
   'z': 'ㅋ', 'x': 'ㅌ', 'c': 'ㅊ', 'v': 'ㅍ',
   'b': 'ㅠ', 'n': 'ㅜ', 'm': 'ㅡ',
 };
@@ -71,46 +71,47 @@ export const korToEngMap: Record<string, string> = {
   'ㅂ': 'q', 'ㅈ': 'w', 'ㄷ': 'e', 'ㄱ': 'r', 'ㅅ': 't',
   'ㅛ': 'y', 'ㅕ': 'u', 'ㅑ': 'i', 'ㅐ': 'o', 'ㅔ': 'p',
   'ㅁ': 'a', 'ㄴ': 's', 'ㅇ': 'd', 'ㄹ': 'f', 'ㅎ': 'g',
-  'ㅗ': 'h', 'ㅏ': 'j', 'ㅣ': 'k',
+  'ㅗ': 'h', 'ㅓ': 'j', 'ㅏ': 'k', 'ㅣ': 'l',
   'ㅋ': 'z', 'ㅌ': 'x', 'ㅊ': 'c', 'ㅍ': 'v',
   'ㅠ': 'b', 'ㅜ': 'n', 'ㅡ': 'm',
 };
 
-// 한글 손가락 매핑
+// 한글 손가락 매핑 - 실제 두벌식 키보드 기준
 export const koreanFingerMapping: Record<string, { finger: string; hand: 'left' | 'right' }> = {
-  // 왼손 새끼
-  'ㅂ': { finger: 'pinky', hand: 'left' },
-  'ㅁ': { finger: 'pinky', hand: 'left' },
-  'ㅋ': { finger: 'pinky', hand: 'left' },
-  // 왼손 약지
-  'ㅈ': { finger: 'ring', hand: 'left' },
-  'ㄴ': { finger: 'ring', hand: 'left' },
-  'ㅌ': { finger: 'ring', hand: 'left' },
-  // 왼손 중지
-  'ㄷ': { finger: 'middle', hand: 'left' },
-  'ㅇ': { finger: 'middle', hand: 'left' },
-  'ㅊ': { finger: 'middle', hand: 'left' },
-  // 왼손 검지
-  'ㄱ': { finger: 'index', hand: 'left' },
-  'ㄹ': { finger: 'index', hand: 'left' },
-  'ㅍ': { finger: 'index', hand: 'left' },
-  'ㅅ': { finger: 'index', hand: 'left' },
-  'ㅎ': { finger: 'index', hand: 'left' },
-  // 오른손 검지
-  'ㅛ': { finger: 'index', hand: 'right' },
-  'ㅗ': { finger: 'index', hand: 'right' },
-  'ㅠ': { finger: 'index', hand: 'right' },
-  'ㅕ': { finger: 'index', hand: 'right' },
-  'ㅏ': { finger: 'index', hand: 'right' },
-  'ㅜ': { finger: 'index', hand: 'right' },
-  // 오른손 중지
-  'ㅑ': { finger: 'middle', hand: 'right' },
-  'ㅣ': { finger: 'middle', hand: 'right' },
-  'ㅡ': { finger: 'middle', hand: 'right' },
-  // 오른손 약지
-  'ㅐ': { finger: 'ring', hand: 'right' },
-  // 오른손 새끼
-  'ㅔ': { finger: 'pinky', hand: 'right' },
+  // 왼손 새끼 (q, a, z)
+  'ㅂ': { finger: 'pinky', hand: 'left' },  // q
+  'ㅁ': { finger: 'pinky', hand: 'left' },  // a
+  'ㅋ': { finger: 'pinky', hand: 'left' },  // z
+  // 왼손 약지 (w, s, x)
+  'ㅈ': { finger: 'ring', hand: 'left' },   // w
+  'ㄴ': { finger: 'ring', hand: 'left' },   // s
+  'ㅌ': { finger: 'ring', hand: 'left' },   // x
+  // 왼손 중지 (e, d, c)
+  'ㄷ': { finger: 'middle', hand: 'left' }, // e
+  'ㅇ': { finger: 'middle', hand: 'left' }, // d
+  'ㅊ': { finger: 'middle', hand: 'left' }, // c
+  // 왼손 검지 (r, t, f, g, v)
+  'ㄱ': { finger: 'index', hand: 'left' },  // r
+  'ㅅ': { finger: 'index', hand: 'left' },  // t
+  'ㄹ': { finger: 'index', hand: 'left' },  // f
+  'ㅎ': { finger: 'index', hand: 'left' },  // g
+  'ㅍ': { finger: 'index', hand: 'left' },  // v
+  // 오른손 검지 (y, u, h, j, b, n)
+  'ㅛ': { finger: 'index', hand: 'right' }, // y
+  'ㅕ': { finger: 'index', hand: 'right' }, // u
+  'ㅗ': { finger: 'index', hand: 'right' }, // h
+  'ㅓ': { finger: 'index', hand: 'right' }, // j
+  'ㅠ': { finger: 'index', hand: 'right' }, // b
+  'ㅜ': { finger: 'index', hand: 'right' }, // n
+  // 오른손 중지 (i, k, m)
+  'ㅑ': { finger: 'middle', hand: 'right' }, // i
+  'ㅏ': { finger: 'middle', hand: 'right' }, // k
+  'ㅡ': { finger: 'middle', hand: 'right' }, // m
+  // 오른손 약지 (o, l)
+  'ㅐ': { finger: 'ring', hand: 'right' },   // o
+  'ㅣ': { finger: 'ring', hand: 'right' },   // l
+  // 오른손 새끼 (p)
+  'ㅔ': { finger: 'pinky', hand: 'right' },  // p
   // 엄지
   ' ': { finger: 'thumb', hand: 'right' },
 };

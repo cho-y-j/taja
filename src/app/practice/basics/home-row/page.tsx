@@ -11,7 +11,7 @@ import { KoreanKeyboardGuide } from '@/components/typing/korean-keyboard-guide';
 import { HandGuide } from '@/components/typing/hand-guide';
 import { useTypingEngine } from '@/hooks/use-typing-engine';
 import { rowLevels, rowNames, generateRowPracticeText, type KeyboardRow } from '@/lib/typing/keyboard-practice';
-import { koreanRowLevels, koreanRowNames, generateKoreanPracticeText } from '@/lib/typing/korean-keyboard';
+import { koreanRowLevels, koreanRowNames, generateKoreanPracticeText, korToEngMap } from '@/lib/typing/korean-keyboard';
 
 type Language = 'en' | 'ko';
 
@@ -461,12 +461,16 @@ export default function KeyboardPracticePage() {
 
         {/* ── Hand guide + Keyboard guide (spread evenly in remaining space) ── */}
         <div className="flex-1 flex flex-col items-center justify-evenly min-h-0">
-          {/* Hand guide */}
-          {language === 'en' && (
-            <div className="shrink-0">
-              <HandGuide activeKey={getNextKey() || undefined} />
-            </div>
-          )}
+          {/* Hand guide - 영어/한글 모두 표시 */}
+          <div className="shrink-0">
+            <HandGuide
+              activeKey={
+                language === 'en'
+                  ? (getNextKey() || undefined)
+                  : (getNextKey() ? korToEngMap[getNextKey()!] || getNextKey()! : undefined)
+              }
+            />
+          </div>
 
           {/* Keyboard */}
           <div className="shrink-0">
