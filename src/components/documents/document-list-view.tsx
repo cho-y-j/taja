@@ -1,6 +1,6 @@
 'use client';
 
-import { PenLine, Upload, Bot, FileText, Trash2, ChevronRight } from 'lucide-react';
+import { PenLine, Upload, Bot, FileText, Trash2, ChevronRight, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
 import { useDocumentStore, type CreateSource } from '@/stores/document-store';
@@ -11,14 +11,15 @@ export function DocumentListView() {
 
   const sources: { key: CreateSource; icon: typeof PenLine; label: string; desc: string }[] = [
     { key: 'manual', icon: PenLine, label: '직접 입력', desc: '문서를 직접 작성합니다' },
-    { key: 'upload', icon: Upload, label: '파일 업로드', desc: '.txt, .md 파일을 업로드합니다' },
-    { key: 'ai', icon: Bot, label: 'AI 생성', desc: 'AI가 원하는 문서를 만들어줍니다' },
+    { key: 'upload', icon: Upload, label: '파일 업로드', desc: 'PDF, TXT 파일 업로드' },
+    { key: 'ai', icon: Bot, label: 'AI 생성', desc: 'AI가 문서를 만들어줍니다' },
+    { key: 'url', icon: Link2, label: 'URL 추출', desc: '웹/유튜브에서 추출' },
   ];
 
   return (
     <div>
       {/* 문서 생성 버튼 */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
         {sources.map((src) => (
           <button
             key={src.key}
