@@ -61,11 +61,12 @@ async function fetchYoutubeTranscript(videoId: string): Promise<string> {
 async function generateVocabAndSentences(
   content: string,
   language: 'ko' | 'en',
-  sourceType: string
+  sourceType: string,
+  customInstruction?: string
 ): Promise<{ title: string; content: string }> {
-  const systemPrompt = language === 'ko'
-    ? `당신은 한국어 학습 콘텐츠를 만드는 전문가입니다.
-주어진 텍스트에서 중요한 단어와 문장을 추출하여 타자 연습용 학습 자료를 만들어주세요.
+  // 커스텀 지시사항이 있으면 사용, 없으면 기본 지시사항
+  const defaultInstruction = language === 'ko'
+    ? `주어진 텍스트에서 중요한 단어와 문장을 추출하여 타자 연습용 학습 자료를 만들어주세요.
 
 다음 형식으로 작성해주세요:
 1. 먼저 "## 주요 단어" 섹션에 중요 단어 10-20개를 나열 (한 줄에 하나씩)
@@ -73,8 +74,7 @@ async function generateVocabAndSentences(
 
 단어와 문장은 원본 텍스트에서 직접 추출하세요.
 타자 연습에 적합하도록 너무 긴 문장은 피해주세요.`
-    : `You are an expert at creating English learning content.
-Extract important words and sentences from the given text to create typing practice material.
+    : `Extract important words and sentences from the given text to create typing practice material.
 
 Format your response as follows:
 1. First, list 10-20 important words under "## Key Words" (one per line)
@@ -83,7 +83,19 @@ Format your response as follows:
 Extract words and sentences directly from the original text.
 Avoid overly long sentences to make them suitable for typing practice.`;
 
-  const userPrompt = `다음 ${sourceType}에서 추출한 텍스트입니다. 단어장과 핵심 문장을 만들어주세요:\n\n${content}`;
+  const systemPrompt = language === 'ko'
+    ? `당신은 한국어 학습 콘텐츠를 만드는 전문가입니다.
+${customInstruction || defaultInstruction}
+
+결과물은 타자 연습에 사용됩니다. 너무 긴 문장은 피하고, 학습에 유용한 내용을 중심으로 작성해주세요.`
+    : `You are an expert at creating English learning content.
+${customInstruction || defaultInstruction}
+
+The output will be used for typing practice. Avoid overly long sentences and focus on useful learning content.`;
+
+  const userPrompt = customInstruction
+    ? `다음 ${sourceType}에서 추출한 텍스트입니다. 사용자의 지시사항에 따라 처리해주세요:\n\n${content}`
+    : `다음 ${sourceType}에서 추출한 텍스트입니다. 단어장과 핵심 문장을 만들어주세요:\n\n${content}`;
 
   const response = await fetch(DEEPSEEK_API_URL, {
     method: 'POST',
@@ -117,10 +129,11 @@ Avoid overly long sentences to make them suitable for typing practice.`;
 
 export async function POST(request: NextRequest) {
   try {
-    const { url, language = 'ko' } = await request.json();
+    const { url, language = 'ko', instruction, content: directContent } = await request.json();
 
-    if (!url) {
-      return NextResponse.json({ error: 'URL이 필요합니다' }, { status: 400 });
+    // URL도 없고 직접 콘텐츠도 없으면 에러
+    if (!url && !directContent) {
+      return NextResponse.json({ error: 'URL 또는 콘텐츠가 필요합니다' }, { status: 400 });
     }
 
     if (!DEEPSEEK_API_KEY) {
@@ -130,15 +143,21 @@ export async function POST(request: NextRequest) {
     let content: string;
     let sourceType: string;
 
-    // YouTube URL인지 확인
-    const youtubeId = extractYoutubeId(url);
-
-    if (youtubeId) {
-      content = await fetchYoutubeTranscript(youtubeId);
-      sourceType = '유튜브 영상';
+    // 직접 콘텐츠가 제공된 경우 (파일 업로드 등)
+    if (directContent) {
+      content = directContent.slice(0, 10000);
+      sourceType = '업로드 파일';
     } else {
-      content = await fetchWebContent(url);
-      sourceType = '웹페이지';
+      // YouTube URL인지 확인
+      const youtubeId = extractYoutubeId(url);
+
+      if (youtubeId) {
+        content = await fetchYoutubeTranscript(youtubeId);
+        sourceType = '유튜브 영상';
+      } else {
+        content = await fetchWebContent(url);
+        sourceType = '웹페이지';
+      }
     }
 
     if (!content || content.length < 50) {
@@ -148,8 +167,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // AI로 단어장과 문장 생성
-    const result = await generateVocabAndSentences(content, language, sourceType);
+    // AI로 단어장과 문장 생성 (커스텀 지시사항 전달)
+    const result = await generateVocabAndSentences(content, language, sourceType, instruction);
 
     return NextResponse.json({
       title: result.title,

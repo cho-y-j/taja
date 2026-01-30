@@ -28,8 +28,11 @@ export function DocumentCreateView() {
 
   const [aiPrompt, setAiPrompt] = useState('');
   const [urlInput, setUrlInput] = useState('');
+  const [urlInstruction, setUrlInstruction] = useState('');
+  const [uploadInstruction, setUploadInstruction] = useState('');
   const [isExtractingUrl, setIsExtractingUrl] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [pendingFileContent, setPendingFileContent] = useState<{name: string; content: string} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isEditing = !!editingDocumentId;
 
@@ -70,7 +73,11 @@ export function DocumentCreateView() {
       const res = await fetch('/api/ai/extract-content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: urlInput, language: draftLanguage }),
+        body: JSON.stringify({
+          url: urlInput,
+          language: draftLanguage,
+          instruction: urlInstruction.trim() || undefined,
+        }),
       });
 
       if (!res.ok) {
@@ -85,7 +92,48 @@ export function DocumentCreateView() {
     } finally {
       setIsExtractingUrl(false);
     }
-  }, [urlInput, draftLanguage, setDraft]);
+  }, [urlInput, urlInstruction, draftLanguage, setDraft]);
+
+  // 파일 콘텐츠를 AI로 처리
+  const handleProcessFileWithAi = useCallback(async () => {
+    if (!pendingFileContent) return;
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      const res = await fetch('/api/ai/extract-content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: pendingFileContent.content,
+          language: draftLanguage,
+          instruction: uploadInstruction.trim() || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'AI 처리 실패');
+      }
+
+      const data = await res.json();
+      setDraft(pendingFileContent.name + ' (AI 정리)', data.content, draftLanguage);
+      setPendingFileContent(null);
+      setUploadInstruction('');
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'AI 처리 오류');
+    } finally {
+      setIsUploading(false);
+    }
+  }, [pendingFileContent, uploadInstruction, draftLanguage, setDraft]);
+
+  // 파일 그대로 사용
+  const handleUseFileAsIs = useCallback(() => {
+    if (!pendingFileContent) return;
+    setDraft(pendingFileContent.name, pendingFileContent.content, draftLanguage);
+    setPendingFileContent(null);
+    setUploadInstruction('');
+  }, [pendingFileContent, draftLanguage, setDraft]);
 
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -113,8 +161,9 @@ export function DocumentCreateView() {
             throw new Error(err.error || 'PDF 파싱 실패');
           }
           const data = await res.json();
-          const lang = detectLanguage(data.text);
-          setDraft(data.fileName || file.name.replace(/\.pdf$/i, ''), data.text, lang);
+          const fileName = data.fileName || file.name.replace(/\.pdf$/i, '');
+          // 파일 내용을 임시 저장 (사용자가 AI 처리 또는 그대로 사용 선택)
+          setPendingFileContent({ name: fileName, content: data.text });
         } catch (err) {
           setUploadError(err instanceof Error ? err.message : 'PDF 파일을 읽을 수 없습니다');
         } finally {
@@ -126,13 +175,13 @@ export function DocumentCreateView() {
         reader.onload = (event) => {
           const text = event.target?.result as string;
           const fileName = file.name.replace(/\.(txt|md)$/i, '');
-          const lang = detectLanguage(text);
-          setDraft(fileName, text, lang);
+          // 파일 내용을 임시 저장
+          setPendingFileContent({ name: fileName, content: text });
         };
         reader.readAsText(file);
       }
     },
-    [setDraft]
+    []
   );
 
   // 저장
@@ -281,35 +330,100 @@ export function DocumentCreateView() {
               <Upload className="w-5 h-5 text-[var(--color-primary)]" />
               <span className="font-semibold">파일 업로드</span>
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".txt,.md,.pdf"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="w-full py-8 border-2 border-dashed border-[var(--color-border)] rounded-xl hover:border-[var(--color-primary)] transition-colors text-center disabled:opacity-50"
-            >
-              {isUploading ? (
-                <>
-                  <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin text-[var(--color-primary)]" />
-                  <p className="text-[var(--color-text-muted)]">PDF 파일을 읽고 있습니다...</p>
-                </>
-              ) : (
-                <>
-                  <Upload className="w-8 h-8 mx-auto mb-2 text-[var(--color-text-muted)]" />
-                  <p className="text-[var(--color-text-muted)]">
-                    클릭하여 파일을 선택하세요
+
+            {!pendingFileContent ? (
+              // 파일 선택 UI
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".txt,.md,.pdf"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="w-full py-8 border-2 border-dashed border-[var(--color-border)] rounded-xl hover:border-[var(--color-primary)] transition-colors text-center disabled:opacity-50"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin text-[var(--color-primary)]" />
+                      <p className="text-[var(--color-text-muted)]">파일을 읽고 있습니다...</p>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 mx-auto mb-2 text-[var(--color-text-muted)]" />
+                      <p className="text-[var(--color-text-muted)]">
+                        클릭하여 파일을 선택하세요
+                      </p>
+                      <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                        .pdf, .txt, .md 지원
+                      </p>
+                    </>
+                  )}
+                </button>
+              </>
+            ) : (
+              // 파일 처리 옵션 UI
+              <div className="space-y-4">
+                <div className="p-4 bg-[var(--color-background)] rounded-lg">
+                  <p className="font-medium text-[var(--color-text)]">{pendingFileContent.name}</p>
+                  <p className="text-sm text-[var(--color-text-muted)]">
+                    {pendingFileContent.content.length.toLocaleString()}자
                   </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-[var(--color-text)]">
+                    AI 지시사항 (선택)
+                  </label>
+                  <textarea
+                    value={uploadInstruction}
+                    onChange={(e) => setUploadInstruction(e.target.value)}
+                    placeholder="예: 이 논문을 요약하고 핵심 단어와 문장을 추출해줘"
+                    rows={3}
+                    className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] text-sm"
+                  />
                   <p className="text-xs text-[var(--color-text-muted)] mt-1">
-                    .pdf, .txt, .md 지원
+                    지시사항 없이 AI 처리하면 기본 단어/문장 추출
                   </p>
-                </>
-              )}
-            </button>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleProcessFileWithAi}
+                    disabled={isUploading}
+                    className="flex-1"
+                  >
+                    {isUploading ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <Bot className="w-4 h-4 mr-2" />
+                    )}
+                    AI로 정리
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleUseFileAsIs}
+                    disabled={isUploading}
+                  >
+                    원본 그대로
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setPendingFileContent(null);
+                      setUploadInstruction('');
+                    }}
+                    disabled={isUploading}
+                  >
+                    취소
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {uploadError && (
               <p className="mt-2 text-sm text-[var(--color-error)]">{uploadError}</p>
             )}
@@ -350,30 +464,54 @@ export function DocumentCreateView() {
                 </button>
               </div>
             </div>
-            <p className="text-sm text-[var(--color-text-muted)] mb-3">
-              웹페이지 또는 유튜브 URL을 입력하면 AI가 단어와 문장을 추출해요
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="url"
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                placeholder="https://... 또는 유튜브 링크"
-                className="flex-1 px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)]"
-                onKeyDown={(e) => e.key === 'Enter' && handleUrlExtract()}
-              />
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-1 text-[var(--color-text)]">
+                  URL 입력
+                </label>
+                <input
+                  type="url"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  placeholder="https://... 또는 유튜브 링크"
+                  className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1 text-[var(--color-text)]">
+                  AI 지시사항 (선택)
+                </label>
+                <textarea
+                  value={urlInstruction}
+                  onChange={(e) => setUrlInstruction(e.target.value)}
+                  placeholder="예: 이 영상에서 나오는 프로그래밍 관련 단어와 예문을 정리해줘"
+                  rows={2}
+                  className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] text-sm"
+                />
+                <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                  지시사항 없으면 기본 단어/문장 추출
+                </p>
+              </div>
+
               <Button
                 onClick={handleUrlExtract}
                 disabled={isExtractingUrl || !urlInput.trim()}
+                className="w-full"
               >
                 {isExtractingUrl ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    추출 중...
+                  </>
                 ) : (
-                  '추출'
+                  '콘텐츠 추출하기'
                 )}
               </Button>
             </div>
-            <div className="mt-3 flex items-center gap-4 text-xs text-[var(--color-text-muted)]">
+
+            <div className="mt-4 flex items-center gap-4 text-xs text-[var(--color-text-muted)]">
               <span className="flex items-center gap-1">
                 <Globe className="w-3 h-3" /> 웹페이지
               </span>
