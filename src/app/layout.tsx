@@ -17,33 +17,20 @@ export const metadata: Metadata = {
   keywords: ['타자 연습', '타이핑', '문해력', 'typing practice', 'literacy'],
 };
 
-// Clerk가 설정되어 있는지 확인
-const isClerkConfigured = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
-  !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.includes('여기에');
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const content = (
-    <html lang="ko" suppressHydrationWarning>
-      <body className={`${notoSansKR.variable} antialiased`}>
-        <ThemeProvider>
-          {children}
-        </ThemeProvider>
-      </body>
-    </html>
-  );
-
-  // Clerk가 설정되지 않았으면 ClerkProvider 없이 렌더링
-  if (!isClerkConfigured) {
-    return content;
-  }
-
   return (
     <ClerkProvider localization={koKR}>
-      {content}
+      <html lang="ko" suppressHydrationWarning>
+        <body className={`${notoSansKR.variable} antialiased`}>
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
+        </body>
+      </html>
     </ClerkProvider>
   );
 }
