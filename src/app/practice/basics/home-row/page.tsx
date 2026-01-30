@@ -12,12 +12,14 @@ import { HandGuide } from '@/components/typing/hand-guide';
 import { useTypingEngine } from '@/hooks/use-typing-engine';
 import { rowLevels, rowNames, generateRowPracticeText, type KeyboardRow } from '@/lib/typing/keyboard-practice';
 import { koreanRowLevels, koreanRowNames, generateKoreanPracticeText, korToEngMap } from '@/lib/typing/korean-keyboard';
+import { useThemeStore } from '@/stores/theme-store';
 
 type Language = 'en' | 'ko';
 
 export default function KeyboardPracticePage() {
   const router = useRouter();
-  const [language, setLanguage] = useState<Language>('en');
+  const { language: storeLanguage, setLanguage: setStoreLanguage } = useThemeStore();
+  const [language, setLanguage] = useState<Language>(storeLanguage || 'en');
   const [selectedRow, setSelectedRow] = useState<KeyboardRow>('home');
   const [currentLevel, setCurrentLevel] = useState(1);
   const [practiceText, setPracticeText] = useState('');
@@ -145,11 +147,20 @@ export default function KeyboardPracticePage() {
     router.push('/');
   }, [router]);
 
+  // 스토어 언어가 변경되면 로컬 상태도 동기화
+  useEffect(() => {
+    if (storeLanguage && storeLanguage !== language) {
+      setLanguage(storeLanguage);
+    }
+  }, [storeLanguage]);
+
   const toggleLanguage = useCallback(() => {
-    setLanguage(prev => prev === 'en' ? 'ko' : 'en');
+    const newLang = language === 'en' ? 'ko' : 'en';
+    setLanguage(newLang);
+    setStoreLanguage(newLang);
     setCurrentLevel(1);
     reset();
-  }, [reset]);
+  }, [language, reset, setStoreLanguage]);
 
   // Enter → next level or restart on complete
   useEffect(() => {

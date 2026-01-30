@@ -24,6 +24,7 @@ import {
   getRandomSentence,
   type PracticeSentence,
 } from '@/lib/typing/sentence-practice';
+import { useThemeStore } from '@/stores/theme-store';
 
 type Language = 'en' | 'ko';
 type ViewMode = 'select' | 'practice';
@@ -37,7 +38,8 @@ const difficultyInfo = {
 
 export default function ListenWritePracticePage() {
   const router = useRouter();
-  const [language, setLanguage] = useState<Language>('ko');
+  const { language: storeLanguage, setLanguage: setStoreLanguage } = useThemeStore();
+  const [language, setLanguage] = useState<Language>(storeLanguage || 'ko');
   const [viewMode, setViewMode] = useState<ViewMode>('select');
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [currentSentence, setCurrentSentence] = useState<PracticeSentence | null>(null);
@@ -245,11 +247,20 @@ export default function ListenWritePracticePage() {
     router.push('/');
   }, [router, stopSpeaking]);
 
+  // 스토어 언어가 변경되면 로컬 상태도 동기화
+  useEffect(() => {
+    if (storeLanguage && storeLanguage !== language) {
+      setLanguage(storeLanguage);
+    }
+  }, [storeLanguage]);
+
   // 언어 전환
   const toggleLanguage = useCallback(() => {
-    setLanguage(prev => prev === 'en' ? 'ko' : 'en');
+    const newLang = language === 'en' ? 'ko' : 'en';
+    setLanguage(newLang);
+    setStoreLanguage(newLang);
     reset();
-  }, [reset]);
+  }, [language, reset, setStoreLanguage]);
 
   // 연습 화면 진입 시 자동으로 읽기
   useEffect(() => {
