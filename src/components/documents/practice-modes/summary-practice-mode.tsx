@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { getPreferredVoice } from '@/lib/speech/tts-utils';
 import { StarRating, getStarRating, getStarMessage } from '@/components/ui/star-rating';
+import { playErrorSound, playKeySound } from '@/lib/utils/sound';
 import { useDocumentStore, type UserDocument } from '@/stores/document-store';
 
 type ViewMode = 'time' | 'practice' | 'result';
@@ -60,6 +61,7 @@ export function SummaryPracticeMode({ document: doc }: Props) {
   const startTimeRef = useRef<number>(0);
   const isFinishedRef = useRef(false);
   const isComposingRef = useRef(false);
+  const prevInputRef = useRef('');
 
   // Load voices
   useEffect(() => {
@@ -200,6 +202,7 @@ export function SummaryPracticeMode({ document: doc }: Props) {
     }
     setIsLoading(false);
     setUserInput('');
+    prevInputRef.current = '';
     setTimeout(() => inputRef.current?.focus(), 50);
   }, [generateSummary, autoListen, speakSummary]);
 
@@ -215,6 +218,19 @@ export function SummaryPracticeMode({ document: doc }: Props) {
 
   const checkSummaryCompletion = useCallback((value: string) => {
     if (isFinishedRef.current || !currentSummary || isLoading) return;
+
+    // Play sound for each new character
+    if (value.length > prevInputRef.current.length) {
+      const newCharIndex = value.length - 1;
+      if (newCharIndex < currentSummary.length) {
+        if (value[newCharIndex] === currentSummary[newCharIndex]) {
+          playKeySound();
+        } else {
+          playErrorSound();
+        }
+      }
+    }
+    prevInputRef.current = value;
 
     if (value.length >= currentSummary.length) {
       let correct = 0;

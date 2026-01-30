@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { extractParagraphs } from '@/lib/documents/document-utils';
 import { getPreferredVoice } from '@/lib/speech/tts-utils';
 import { StarRating, getStarRating, getStarMessage } from '@/components/ui/star-rating';
+import { playErrorSound, playKeySound } from '@/lib/utils/sound';
 import type { UserDocument } from '@/stores/document-store';
 
 type ViewMode = 'time' | 'practice' | 'result';
@@ -59,6 +60,7 @@ export function FullTextPracticeMode({ document: doc }: Props) {
   const startTimeRef = useRef<number>(0);
   const isFinishedRef = useRef(false);
   const isComposingRef = useRef(false);
+  const prevInputRef = useRef('');
 
   // Load voices
   useEffect(() => {
@@ -173,6 +175,7 @@ export function FullTextPracticeMode({ document: doc }: Props) {
       if (autoListen) speakParagraph(paragraphs[0]);
     }
     setUserInput('');
+    prevInputRef.current = '';
     setTimeout(() => inputRef.current?.focus(), 50);
   }, [currentParagraphIndex, paragraphs, autoListen, speakParagraph]);
 
@@ -188,6 +191,19 @@ export function FullTextPracticeMode({ document: doc }: Props) {
 
   const checkParagraphCompletion = useCallback((value: string) => {
     if (isFinishedRef.current || !currentParagraph) return;
+
+    // Play sound for each new character
+    if (value.length > prevInputRef.current.length) {
+      const newCharIndex = value.length - 1;
+      if (newCharIndex < currentParagraph.length) {
+        if (value[newCharIndex] === currentParagraph[newCharIndex]) {
+          playKeySound();
+        } else {
+          playErrorSound();
+        }
+      }
+    }
+    prevInputRef.current = value;
 
     if (value.length >= currentParagraph.length) {
       let correct = 0;

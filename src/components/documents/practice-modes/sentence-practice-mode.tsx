@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { RotateCcw, Clock, Target, Zap, Trophy, Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { RotateCcw, Clock, Target, Zap, Trophy, Play, Pause, Volume2, VolumeX, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { extractSentences } from '@/lib/documents/document-utils';
 import { getPreferredVoice } from '@/lib/speech/tts-utils';
 import { StarRating, getStarRating, getStarMessage } from '@/components/ui/star-rating';
+import { playErrorSound, playKeySound } from '@/lib/utils/sound';
 import type { UserDocument } from '@/stores/document-store';
 
 type ViewMode = 'time' | 'practice' | 'result';
@@ -53,7 +54,12 @@ export function SentencePracticeMode({ document: doc }: Props) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
+  // Translation
+  const [showTranslation, setShowTranslation] = useState(false);
+  const [translation, setTranslation] = useState('');
+
   const inputRef = useRef<HTMLInputElement>(null);
+  const prevInputRef = useRef('');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const wpmTimerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -160,23 +166,36 @@ export function SentencePracticeMode({ document: doc }: Props) {
     };
   }, [viewMode, isStarted, isPaused, finishSession]);
 
+  // Fetch translation for sentence
+  const fetchTranslation = useCallback(async (text: string) => {
+    if (!text) return;
+    const targetLang = doc.language === 'en' ? 'ko' : 'en';
+    setTranslation(`(${targetLang === 'ko' ? '한글 해석' : 'English translation'})`);
+  }, [doc.language]);
+
   // Move to next sentence
   const moveToNextSentence = useCallback(() => {
     const nextIndex = currentSentenceIndex + 1;
+    let nextSentence = '';
     if (nextIndex < sentences.length) {
       setCurrentSentenceIndex(nextIndex);
       setCurrentSentence(sentences[nextIndex]);
+      nextSentence = sentences[nextIndex];
       if (autoListen) speakSentence(sentences[nextIndex]);
     } else {
       const shuffled = [...allSentences].sort(() => Math.random() - 0.5);
       setSentences(shuffled);
       setCurrentSentenceIndex(0);
       setCurrentSentence(shuffled[0] || '');
+      nextSentence = shuffled[0] || '';
       if (autoListen) speakSentence(shuffled[0]);
     }
     setUserInput('');
+    prevInputRef.current = '';
+    setTranslation('');
+    if (showTranslation) fetchTranslation(nextSentence);
     setTimeout(() => inputRef.current?.focus(), 50);
-  }, [currentSentenceIndex, sentences, allSentences, autoListen, speakSentence]);
+  }, [currentSentenceIndex, sentences, allSentences, autoListen, speakSentence, showTranslation, fetchTranslation]);
 
   // Input handlers
   const handleCompositionStart = useCallback(() => { isComposingRef.current = true; }, []);
@@ -190,6 +209,19 @@ export function SentencePracticeMode({ document: doc }: Props) {
 
   const checkSentenceCompletion = useCallback((value: string) => {
     if (isFinishedRef.current || !currentSentence) return;
+
+    // Play sound for each new character
+    if (value.length > prevInputRef.current.length) {
+      const newCharIndex = value.length - 1;
+      if (newCharIndex < currentSentence.length) {
+        if (value[newCharIndex] === currentSentence[newCharIndex]) {
+          playKeySound();
+        } else {
+          playErrorSound();
+        }
+      }
+    }
+    prevInputRef.current = value;
 
     if (value.length >= currentSentence.length) {
       let correct = 0;
@@ -374,7 +406,7 @@ export function SentencePracticeMode({ document: doc }: Props) {
         <Card className="mb-4">
           <CardContent className="py-6">
             {/* Target sentence */}
-            <div className="text-xl leading-relaxed mb-6 font-mono tracking-wide min-h-[80px]">
+            <div className="text-xl leading-relaxed mb-2 font-mono tracking-wide min-h-[80px]">
               {feedback.map((item, index) => (
                 <span
                   key={index}
@@ -389,6 +421,13 @@ export function SentencePracticeMode({ document: doc }: Props) {
                 </span>
               ))}
             </div>
+
+            {/* Translation hint */}
+            {showTranslation && (
+              <div className="text-center mb-4 text-[var(--color-text-muted)] text-sm">
+                {translation || '...'}
+              </div>
+            )}
 
             {/* Input */}
             <input
@@ -409,7 +448,7 @@ export function SentencePracticeMode({ document: doc }: Props) {
         </Card>
 
         {/* Controls */}
-        <div className="flex justify-center gap-3">
+        <div className="flex justify-center gap-3 flex-wrap">
           <Button variant="outline" size="sm" onClick={togglePause}>
             {isPaused ? <Play className="w-4 h-4 mr-1" /> : <Pause className="w-4 h-4 mr-1" />}
             {isPaused ? '계속' : '일시정지'}
@@ -421,6 +460,19 @@ export function SentencePracticeMode({ document: doc }: Props) {
           >
             {autoListen ? <VolumeX className="w-4 h-4 mr-1" /> : <Volume2 className="w-4 h-4 mr-1" />}
             {autoListen ? '음성 끄기' : '음성 듣기'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setShowTranslation(!showTranslation);
+              if (!showTranslation && currentSentence) {
+                fetchTranslation(currentSentence);
+              }
+            }}
+          >
+            {showTranslation ? <EyeOff className="w-4 h-4 mr-1" /> : <Eye className="w-4 h-4 mr-1" />}
+            {showTranslation ? '해석 숨기기' : '해석 보기'}
           </Button>
           <Button variant="outline" size="sm" onClick={handleRestart}>
             <RotateCcw className="w-4 h-4 mr-1" />

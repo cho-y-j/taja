@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, RotateCcw, Play, Home, X, Globe } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Play, Home, X, Globe, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { MetricsDisplay } from '@/components/typing/metrics-display';
 import { useTypingEngine } from '@/hooks/use-typing-engine';
-import { wordLevels, generateWordPracticeText } from '@/lib/typing/word-practice';
+import { wordLevels, getRandomWordsWithMeaning, type WordWithMeaning } from '@/lib/typing/word-practice';
 
 type Language = 'en' | 'ko';
 
@@ -18,14 +18,17 @@ export default function WordPracticePage() {
   const [currentLevel, setCurrentLevel] = useState(1);
   const [practiceText, setPracticeText] = useState('');
   const [showLevelSelect, setShowLevelSelect] = useState(true);
+  const [wordsWithMeaning, setWordsWithMeaning] = useState<WordWithMeaning[]>([]);
+  const [showTranslation, setShowTranslation] = useState(false);
 
   const currentLevelData = wordLevels[currentLevel - 1];
 
   // 연습 텍스트 생성
   useEffect(() => {
     if (!showLevelSelect) {
-      const text = generateWordPracticeText(language, currentLevel, 10);
-      setPracticeText(text);
+      const words = getRandomWordsWithMeaning(language, currentLevel, 10);
+      setWordsWithMeaning(words);
+      setPracticeText(words.map(w => w.word).join(' '));
     }
   }, [currentLevel, showLevelSelect, language]);
 
@@ -43,6 +46,15 @@ export default function WordPracticePage() {
     processBackspace,
     startSession,
   } = useTypingEngine(practiceText, 'words');
+
+  // 현재 단어 위치 기반으로 해석 가져오기
+  const currentWordIndex = useMemo(() => {
+    const typed = practiceText.substring(0, userInput?.length || 0);
+    const spacesBeforeCurrent = (typed.match(/ /g) || []).length;
+    return Math.min(spacesBeforeCurrent, wordsWithMeaning.length - 1);
+  }, [practiceText, userInput, wordsWithMeaning.length]);
+
+  const currentMeaning = wordsWithMeaning[currentWordIndex]?.meaning || '';
 
   const inputRef = useRef<HTMLInputElement>(null);
   const isComposingRef = useRef(false);
@@ -108,14 +120,16 @@ export default function WordPracticePage() {
   // 연습 시작
   const handleStart = useCallback(() => {
     setShowLevelSelect(false);
-    const text = generateWordPracticeText(language, currentLevel, 10);
-    setPracticeText(text);
+    const words = getRandomWordsWithMeaning(language, currentLevel, 10);
+    setWordsWithMeaning(words);
+    setPracticeText(words.map(w => w.word).join(' '));
   }, [currentLevel, language]);
 
   // 다시 연습
   const handleRestart = useCallback(() => {
-    const text = generateWordPracticeText(language, currentLevel, 10);
-    setPracticeText(text);
+    const words = getRandomWordsWithMeaning(language, currentLevel, 10);
+    setWordsWithMeaning(words);
+    setPracticeText(words.map(w => w.word).join(' '));
     reset();
     setTimeout(() => inputRef.current?.focus(), 100);
   }, [currentLevel, language, reset, inputRef]);
@@ -274,7 +288,7 @@ export default function WordPracticePage() {
         <Card className="mb-6">
           <CardContent className="py-6">
             {/* 목표 텍스트 (위) */}
-            <div className="text-2xl leading-relaxed mb-6 font-mono tracking-wide min-h-[60px] text-center">
+            <div className="text-2xl leading-relaxed mb-2 font-mono tracking-wide min-h-[60px] text-center">
               {getCharacterFeedback().map((item, index) => (
                 <span
                   key={index}
@@ -292,6 +306,13 @@ export default function WordPracticePage() {
                 </span>
               ))}
             </div>
+
+            {/* 해석 표시 */}
+            {showTranslation && currentMeaning && (
+              <div className="text-center mb-4 text-[var(--color-text-muted)] text-sm">
+                ({currentMeaning})
+              </div>
+            )}
 
             {/* 입력 필드 (아래) */}
             <input
@@ -315,12 +336,16 @@ export default function WordPracticePage() {
         <MetricsDisplay metrics={metrics} className="mb-6" />
 
         {/* 컨트롤 버튼 */}
-        <div className="flex justify-center gap-4 mt-8">
+        <div className="flex justify-center gap-4 mt-8 flex-wrap">
           {!isComplete && isStarted && (
             <Button variant="outline" onClick={isPaused ? resume : pause}>
               {isPaused ? '계속' : '일시정지'}
             </Button>
           )}
+          <Button variant="outline" onClick={() => setShowTranslation(!showTranslation)}>
+            {showTranslation ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
+            {showTranslation ? '해석 숨기기' : '해석 보기'}
+          </Button>
           <Button variant="outline" onClick={handleRestart}>
             <RotateCcw className="w-4 h-4 mr-2" />
             다시 연습

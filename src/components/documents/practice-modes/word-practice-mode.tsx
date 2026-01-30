@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { RotateCcw, Clock, Target, Zap, Trophy, Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { RotateCcw, Clock, Target, Zap, Trophy, Play, Pause, Volume2, VolumeX, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { extractWords } from '@/lib/documents/document-utils';
 import { getPreferredVoice } from '@/lib/speech/tts-utils';
 import { StarRating, getStarRating, getStarMessage } from '@/components/ui/star-rating';
+import { playErrorSound, playKeySound } from '@/lib/utils/sound';
 import type { UserDocument } from '@/stores/document-store';
 
 type ViewMode = 'time' | 'practice' | 'result';
@@ -52,6 +53,10 @@ export function WordPracticeMode({ document: doc }: Props) {
   const [autoListen, setAutoListen] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+
+  // Translation
+  const [showTranslation, setShowTranslation] = useState(false);
+  const [translation, setTranslation] = useState('');
 
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -160,23 +165,38 @@ export function WordPracticeMode({ document: doc }: Props) {
     };
   }, [viewMode, isStarted, isPaused, finishSession]);
 
+  // Fetch translation for word
+  const fetchTranslation = useCallback(async (word: string) => {
+    if (!word) return;
+    // For now, just show opposite language hint
+    // Could be enhanced with actual translation API later
+    const targetLang = doc.language === 'en' ? 'ko' : 'en';
+    setTranslation(`(${targetLang === 'ko' ? '한글 해석' : 'English meaning'})`);
+  }, [doc.language]);
+
   // Move to next word
   const moveToNextWord = useCallback(() => {
     const nextIndex = currentWordIndex + 1;
+    let nextWord = '';
     if (nextIndex < words.length) {
       setCurrentWordIndex(nextIndex);
       setCurrentWord(words[nextIndex]);
+      nextWord = words[nextIndex];
     } else {
       // Reshuffle and restart
       const shuffled = [...allWords].sort(() => Math.random() - 0.5);
       setWords(shuffled);
       setCurrentWordIndex(0);
       setCurrentWord(shuffled[0] || '');
+      nextWord = shuffled[0] || '';
     }
     setUserInput('');
-    if (autoListen) speakWord(words[nextIndex] || allWords[0]);
+    prevInputRef.current = '';
+    setTranslation('');
+    if (autoListen) speakWord(nextWord);
+    if (showTranslation) fetchTranslation(nextWord);
     setTimeout(() => inputRef.current?.focus(), 50);
-  }, [currentWordIndex, words, allWords, autoListen, speakWord]);
+  }, [currentWordIndex, words, allWords, autoListen, speakWord, showTranslation, fetchTranslation]);
 
   // Input handlers
   const handleCompositionStart = useCallback(() => { isComposingRef.current = true; }, []);
@@ -188,8 +208,24 @@ export function WordPracticeMode({ document: doc }: Props) {
     checkWordCompletion(value);
   }, []);
 
+  // Previous input for sound comparison
+  const prevInputRef = useRef('');
+
   const checkWordCompletion = useCallback((value: string) => {
     if (isFinishedRef.current || !currentWord) return;
+
+    // Play sound for each new character
+    if (value.length > prevInputRef.current.length) {
+      const newCharIndex = value.length - 1;
+      if (newCharIndex < currentWord.length) {
+        if (value[newCharIndex] === currentWord[newCharIndex]) {
+          playKeySound();
+        } else {
+          playErrorSound();
+        }
+      }
+    }
+    prevInputRef.current = value;
 
     if (value.length >= currentWord.length) {
       let correct = 0;
@@ -374,7 +410,7 @@ export function WordPracticeMode({ document: doc }: Props) {
         <Card className="mb-4">
           <CardContent className="py-6">
             {/* Target word */}
-            <div className="text-4xl leading-relaxed mb-6 font-mono tracking-wide text-center min-h-[60px]">
+            <div className="text-4xl leading-relaxed mb-2 font-mono tracking-wide text-center min-h-[60px]">
               {feedback.map((item, index) => (
                 <span
                   key={index}
@@ -389,6 +425,13 @@ export function WordPracticeMode({ document: doc }: Props) {
                 </span>
               ))}
             </div>
+
+            {/* Translation hint */}
+            {showTranslation && (
+              <div className="text-center mb-4 text-[var(--color-text-muted)] text-sm">
+                {translation || '...'}
+              </div>
+            )}
 
             {/* Input */}
             <input
@@ -409,7 +452,7 @@ export function WordPracticeMode({ document: doc }: Props) {
         </Card>
 
         {/* Controls */}
-        <div className="flex justify-center gap-3">
+        <div className="flex justify-center gap-3 flex-wrap">
           <Button variant="outline" size="sm" onClick={togglePause}>
             {isPaused ? <Play className="w-4 h-4 mr-1" /> : <Pause className="w-4 h-4 mr-1" />}
             {isPaused ? '계속' : '일시정지'}
@@ -421,6 +464,19 @@ export function WordPracticeMode({ document: doc }: Props) {
           >
             {autoListen ? <VolumeX className="w-4 h-4 mr-1" /> : <Volume2 className="w-4 h-4 mr-1" />}
             {autoListen ? '음성 끄기' : '음성 듣기'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setShowTranslation(!showTranslation);
+              if (!showTranslation && currentWord) {
+                fetchTranslation(currentWord);
+              }
+            }}
+          >
+            {showTranslation ? <EyeOff className="w-4 h-4 mr-1" /> : <Eye className="w-4 h-4 mr-1" />}
+            {showTranslation ? '해석 숨기기' : '해석 보기'}
           </Button>
           <Button variant="outline" size="sm" onClick={handleRestart}>
             <RotateCcw className="w-4 h-4 mr-1" />
