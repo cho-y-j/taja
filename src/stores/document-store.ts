@@ -6,8 +6,9 @@ export interface UserDocument {
   name: string;
   content: string;
   language: 'en' | 'ko';
-  source: 'manual' | 'upload' | 'ai';
+  source: 'manual' | 'upload' | 'ai' | 'url';
   aiPrompt?: string;
+  sourceUrl?: string;
   translation?: string;
   summary?: string;
   // 번역 캐시: { "원문": "번역" }
@@ -24,7 +25,7 @@ export type PracticeMode =
   | 'full-text'
   | 'listen-write'
   | 'read-speak';
-export type CreateSource = 'manual' | 'upload' | 'ai';
+export type CreateSource = 'manual' | 'upload' | 'ai' | 'url';
 
 interface DocumentState {
   // Persisted

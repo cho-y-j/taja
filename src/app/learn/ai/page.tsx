@@ -11,6 +11,7 @@ import {
   Sparkles,
   ChevronRight,
   Folder,
+  Link2,
 } from 'lucide-react';
 import { useThemeStore } from '@/stores/theme-store';
 import { useDocumentStore } from '@/stores/document-store';
@@ -27,9 +28,9 @@ export default function AILearningPage() {
     }
   }, [language, router]);
 
-  const handleCreateNew = (type: 'input' | 'upload' | 'ai') => {
+  const handleCreateNew = (type: 'input' | 'upload' | 'ai' | 'url') => {
     const source = type === 'input' ? 'manual' : type;
-    startCreate(source as 'manual' | 'upload' | 'ai');
+    startCreate(source as 'manual' | 'upload' | 'ai' | 'url');
     router.push('/documents');
   };
 
@@ -75,7 +76,7 @@ export default function AILearningPage() {
             새 문서 만들기
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {/* 직접 입력 */}
             <button
               onClick={() => handleCreateNew('input')}
@@ -124,6 +125,23 @@ export default function AILearningPage() {
               </h3>
               <p className="text-xs text-[var(--color-text-muted)]">
                 AI가 콘텐츠를 만들어요
+              </p>
+            </button>
+
+            {/* URL/유튜브 추출 */}
+            <button
+              onClick={() => handleCreateNew('url')}
+              className="card p-5 text-center hover:shadow-lg transition-all group animate-slide-up"
+              style={{ animationDelay: '0.25s' }}
+            >
+              <div className="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center group-hover:scale-110 transition-transform" style={{ background: 'linear-gradient(135deg, #FF6B6B, #FF8E53)' }}>
+                <Link2 className="w-6 h-6 text-white" />
+              </div>
+              <h3 className="font-bold text-[var(--color-text)] mb-1">
+                URL 추출
+              </h3>
+              <p className="text-xs text-[var(--color-text-muted)]">
+                웹/유튜브에서 추출
               </p>
             </button>
           </div>

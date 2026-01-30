@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { ArrowLeft, Bot, Upload, Save, Globe, Loader2 } from 'lucide-react';
+import { ArrowLeft, Bot, Upload, Save, Globe, Loader2, Link2, Youtube } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useDocumentStore } from '@/stores/document-store';
@@ -27,6 +27,9 @@ export function DocumentCreateView() {
   } = useDocumentStore();
 
   const [aiPrompt, setAiPrompt] = useState('');
+  const [urlInput, setUrlInput] = useState('');
+  const [isExtractingUrl, setIsExtractingUrl] = useState(false);
+  const [urlError, setUrlError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isEditing = !!editingDocumentId;
 
@@ -56,6 +59,33 @@ export function DocumentCreateView() {
       setGenerating(false);
     }
   }, [aiPrompt, draftLanguage, setDraft, setGenerating, setGenerationError]);
+
+  // URL에서 콘텐츠 추출
+  const handleUrlExtract = useCallback(async () => {
+    if (!urlInput.trim()) return;
+    setIsExtractingUrl(true);
+    setUrlError(null);
+
+    try {
+      const res = await fetch('/api/ai/extract-content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: urlInput, language: draftLanguage }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || '콘텐츠 추출 실패');
+      }
+
+      const data = await res.json();
+      setDraft(data.title || 'URL 단어장', data.content, draftLanguage);
+    } catch (err) {
+      setUrlError(err instanceof Error ? err.message : 'URL 추출 오류');
+    } finally {
+      setIsExtractingUrl(false);
+    }
+  }, [urlInput, draftLanguage, setDraft]);
 
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -282,6 +312,79 @@ export function DocumentCreateView() {
             </button>
             {uploadError && (
               <p className="mt-2 text-sm text-[var(--color-error)]">{uploadError}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* URL/유튜브 추출 (URL 모드일 때만) */}
+      {createSource === 'url' && (
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Link2 className="w-5 h-5 text-[var(--color-primary)]" />
+                <span className="font-semibold">URL에서 단어장 만들기</span>
+              </div>
+              {/* 생성 언어 선택 */}
+              <div className="flex items-center gap-1 bg-[var(--color-border)] rounded-lg p-1">
+                <button
+                  onClick={() => setDraft(draftName, draftContent, 'ko')}
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                    draftLanguage === 'ko'
+                      ? 'bg-[var(--color-primary)] text-white'
+                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  한국어
+                </button>
+                <button
+                  onClick={() => setDraft(draftName, draftContent, 'en')}
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                    draftLanguage === 'en'
+                      ? 'bg-[var(--color-primary)] text-white'
+                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  English
+                </button>
+              </div>
+            </div>
+            <p className="text-sm text-[var(--color-text-muted)] mb-3">
+              웹페이지 또는 유튜브 URL을 입력하면 AI가 단어와 문장을 추출해요
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                placeholder="https://... 또는 유튜브 링크"
+                className="flex-1 px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)]"
+                onKeyDown={(e) => e.key === 'Enter' && handleUrlExtract()}
+              />
+              <Button
+                onClick={handleUrlExtract}
+                disabled={isExtractingUrl || !urlInput.trim()}
+              >
+                {isExtractingUrl ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  '추출'
+                )}
+              </Button>
+            </div>
+            <div className="mt-3 flex items-center gap-4 text-xs text-[var(--color-text-muted)]">
+              <span className="flex items-center gap-1">
+                <Globe className="w-3 h-3" /> 웹페이지
+              </span>
+              <span className="flex items-center gap-1">
+                <Youtube className="w-3 h-3" /> 유튜브 (자막 필요)
+              </span>
+            </div>
+            {urlError && (
+              <p className="mt-2 text-sm text-[var(--color-error)]">
+                {urlError}
+              </p>
             )}
           </CardContent>
         </Card>
