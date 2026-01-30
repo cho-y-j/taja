@@ -13,6 +13,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@clerk/localizations": "^3.35.3",
     "@clerk/nextjs": "^6.36.10",
     "@neondatabase/serverless": "^1.0.2",
     "class-variance-authority": "^0.7.1",

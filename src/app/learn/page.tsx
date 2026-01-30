@@ -1,20 +1,47 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   BookOpen,
   Sparkles,
   ChevronRight,
-  BarChart3,
   Settings,
+  Lock,
 } from 'lucide-react';
 import { useThemeStore } from '@/stores/theme-store';
+import { UserMenu } from '@/components/layout/user-menu';
+
+// Clerk가 설정되어 있는지 확인
+const CLERK_CONFIGURED = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
+  !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.includes('여기에') &&
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.startsWith('pk_');
 
 export default function LearnPage() {
   const router = useRouter();
   const { language, setLanguage, toggleMode } = useThemeStore();
+  const [isSignedIn, setIsSignedIn] = useState(false);
+
+  // Clerk가 설정된 경우에만 로그인 상태 확인
+  useEffect(() => {
+    if (CLERK_CONFIGURED && typeof window !== 'undefined') {
+      // Clerk 전역 객체에서 상태 확인
+      const checkAuth = () => {
+        const clerk = (window as unknown as { Clerk?: { session?: unknown } }).Clerk;
+        if (clerk) {
+          setIsSignedIn(!!clerk.session);
+        }
+      };
+
+      // 주기적으로 확인 (Clerk 로드 대기)
+      const interval = setInterval(checkAuth, 100);
+      setTimeout(() => clearInterval(interval), 3000);
+      checkAuth();
+
+      return () => clearInterval(interval);
+    }
+  }, []);
 
   // 언어가 선택되지 않았다면 홈으로 리다이렉트
   useEffect(() => {
@@ -54,12 +81,10 @@ export default function LearnPage() {
           </button>
 
           <div className="flex items-center gap-2">
-            <Link href="/dashboard" className="icon-btn">
-              <BarChart3 className="w-5 h-5" />
-            </Link>
             <button onClick={toggleMode} className="icon-btn">
               <Settings className="w-5 h-5" />
             </button>
+            <UserMenu />
           </div>
         </div>
       </header>
@@ -110,23 +135,31 @@ export default function LearnPage() {
           </Link>
 
           {/* AI 학습 */}
-          <Link href="/learn/ai" className="block">
+          <Link href={isSignedIn ? '/learn/ai' : '/sign-in'} className="block">
             <div className="path-card animate-slide-up" style={{ animationDelay: '0.2s' }}>
               <div className="flex items-start gap-4">
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--gradient-secondary)' }}>
                   <Sparkles className="w-7 h-7 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-xl font-bold text-[var(--color-text)] mb-1">
-                    AI 학습
-                  </h2>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h2 className="text-xl font-bold text-[var(--color-text)]">
+                      AI 학습
+                    </h2>
+                    {!isSignedIn && (
+                      <span className="flex items-center gap-1 text-xs text-[var(--color-text-muted)] bg-[var(--color-background)] px-2 py-0.5 rounded-full">
+                        <Lock className="w-3 h-3" />
+                        로그인 필요
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-[var(--color-text-muted)] mb-3">
                     나만의 문서로 연습하거나 AI가 만들어주는 콘텐츠로!
                   </p>
                   {/* 문서 수 */}
                   <div className="flex items-center gap-2">
                     <span className="badge badge-secondary">
-                      내 문서: 0개
+                      {isSignedIn ? '내 문서 관리' : '로그인하고 시작하기'}
                     </span>
                   </div>
                 </div>
