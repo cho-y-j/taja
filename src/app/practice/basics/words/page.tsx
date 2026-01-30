@@ -342,7 +342,11 @@ export default function WordPracticePage() {
               {isPaused ? '계속' : '일시정지'}
             </Button>
           )}
-          <Button variant="outline" onClick={() => setShowTranslation(!showTranslation)}>
+          <Button
+            variant="outline"
+            onClick={() => setShowTranslation(!showTranslation)}
+            className={showTranslation ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600' : ''}
+          >
             {showTranslation ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
             {showTranslation ? '해석 숨기기' : '해석 보기'}
           </Button>

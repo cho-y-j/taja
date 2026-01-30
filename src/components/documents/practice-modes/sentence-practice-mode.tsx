@@ -486,6 +486,7 @@ export function SentencePracticeMode({ document: doc }: Props) {
             variant="outline"
             size="sm"
             onClick={() => { setAutoListen(!autoListen); if (!autoListen) speakSentence(currentSentence); }}
+            className={autoListen ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600' : ''}
           >
             {autoListen ? <VolumeX className="w-4 h-4 mr-1" /> : <Volume2 className="w-4 h-4 mr-1" />}
             {autoListen ? '음성 끄기' : '음성 듣기'}
@@ -499,6 +500,7 @@ export function SentencePracticeMode({ document: doc }: Props) {
                 fetchTranslation(currentSentence);
               }
             }}
+            className={showTranslation ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600' : ''}
           >
             {showTranslation ? <EyeOff className="w-4 h-4 mr-1" /> : <Eye className="w-4 h-4 mr-1" />}
             {showTranslation ? '해석 숨기기' : '해석 보기'}

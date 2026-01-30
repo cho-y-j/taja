@@ -442,6 +442,7 @@ export function FullTextPracticeMode({ document: doc }: Props) {
             variant="outline"
             size="sm"
             onClick={() => { setAutoListen(!autoListen); if (!autoListen) speakParagraph(currentParagraph); }}
+            className={autoListen ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600' : ''}
           >
             {autoListen ? <VolumeX className="w-4 h-4 mr-1" /> : <Volume2 className="w-4 h-4 mr-1" />}
             {autoListen ? '음성 끄기' : '음성 듣기'}
