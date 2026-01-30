@@ -19,7 +19,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { MetricsDisplay } from '@/components/typing/metrics-display';
 import { useTypingEngine } from '@/hooks/use-typing-engine';
-import { engToKorMap } from '@/lib/typing/korean-keyboard';
 import {
   getSampleSentences,
   getRandomSentence,
@@ -82,11 +81,62 @@ export default function ListenWritePracticePage() {
     reset,
     pause,
     resume,
-    inputRef,
     processInput,
     processBackspace,
     startSession,
   } = useTypingEngine(practiceText, 'listen-write');
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isComposingRef = useRef(false);
+  const [inputValue, setInputValue] = useState('');
+
+  // userInput이 리셋되면 inputValue도 리셋
+  useEffect(() => {
+    if (userInput === '') {
+      setInputValue('');
+    }
+  }, [userInput]);
+
+  // 한글 IME 조합 시작
+  const handleCompositionStart = useCallback(() => {
+    isComposingRef.current = true;
+  }, []);
+
+  // 한글 IME 조합 완료
+  const handleCompositionEnd = useCallback((e: React.CompositionEvent<HTMLInputElement>) => {
+    isComposingRef.current = false;
+    const value = e.currentTarget.value;
+    setInputValue(value);
+
+    const currentLen = userInput.length;
+    for (let i = currentLen; i < value.length; i++) {
+      processInput(value[i]);
+    }
+  }, [userInput, processInput]);
+
+  // 입력 변경 처리
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+
+    if (!isStarted && value.length > 0) {
+      startSession();
+    }
+
+    if (isComposingRef.current) return;
+
+    if (value.length < userInput.length) {
+      const diff = userInput.length - value.length;
+      for (let i = 0; i < diff; i++) {
+        processBackspace();
+      }
+      return;
+    }
+
+    for (let i = userInput.length; i < value.length; i++) {
+      processInput(value[i]);
+    }
+  }, [isStarted, userInput, processInput, processBackspace, startSession]);
 
   // 자연스러운 음성 선택
   const getPreferredVoice = useCallback((lang: Language) => {
@@ -149,42 +199,6 @@ export default function ListenWritePracticePage() {
     };
   }, []);
 
-  // 한글 입력 처리를 위한 커스텀 핸들러
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (isComplete || isPaused) return;
-
-      // 백스페이스 처리
-      if (e.key === 'Backspace') {
-        e.preventDefault();
-        processBackspace();
-        return;
-      }
-
-      if (e.key.length !== 1) return;
-
-      e.preventDefault();
-
-      if (!isStarted) {
-        startSession();
-      }
-
-      if (language === 'ko') {
-        const specialChars = ['.', ',', '!', '?', ' ', ':', ';', '"', "'", '(', ')', '-'];
-        if (specialChars.includes(e.key)) {
-          processInput(e.key);
-        } else {
-          const koreanKey = engToKorMap[e.key.toLowerCase()];
-          if (koreanKey) {
-            processInput(koreanKey);
-          }
-        }
-      } else {
-        processInput(e.key);
-      }
-    },
-    [isComplete, isPaused, isStarted, language, processInput, processBackspace, startSession]
-  );
 
   // 연습 시작
   const handleStartPractice = useCallback((sentence: PracticeSentence) => {
@@ -436,58 +450,60 @@ export default function ListenWritePracticePage() {
           </Card>
         )}
 
-        {/* 받아쓰기 진행 상황 (정답 숨기기) */}
-        <div onClick={() => inputRef.current?.focus()} className="cursor-text relative mb-6">
-          <input
-            ref={inputRef}
-            type="text"
-            value=""
-            onChange={() => {}}
-            className="absolute opacity-0 w-0 h-0"
-            onKeyDown={handleKeyDown}
-            aria-label="받아쓰기 입력"
-            autoFocus
-          />
-          <div className="font-mono text-2xl leading-relaxed tracking-wide p-6 bg-[var(--color-surface)] rounded-[var(--radius-lg)] border border-[var(--color-border)]">
-            {practiceText.split('').map((targetChar, index) => {
-              if (index < currentIndex) {
-                // 이미 타이핑한 글자: 사용자가 입력한 글자 표시
-                const isError = errors.includes(index);
-                const typedChar = userInput[index] || targetChar;
+        {/* 받아쓰기 진행 상황 */}
+        <Card className="mb-6">
+          <CardContent className="py-6">
+            {/* 진행 상황 표시 (위) - 타이핑한 글자만 보여주고 나머지는 ● */}
+            <div className="font-mono text-2xl leading-relaxed tracking-wide p-4 bg-gray-50 rounded-lg border border-[var(--color-border)] mb-4 min-h-[80px]">
+              {practiceText.split('').map((targetChar, index) => {
+                if (index < currentIndex) {
+                  const isError = errors.includes(index);
+                  const typedChar = userInput[index] || targetChar;
+                  return (
+                    <span
+                      key={index}
+                      className={isError ? 'text-red-500 bg-red-100' : 'text-green-600'}
+                    >
+                      {typedChar === ' ' ? '\u00A0' : typedChar}
+                    </span>
+                  );
+                }
+                if (index === currentIndex) {
+                  return (
+                    <span key={index} className="bg-yellow-300 animate-pulse">
+                      {targetChar === ' ' ? '\u00A0' : '●'}
+                    </span>
+                  );
+                }
                 return (
-                  <span
-                    key={index}
-                    className={isError ? 'typing-char typing-char--error' : 'typing-char typing-char--correct'}
-                  >
-                    {typedChar === ' ' ? '\u00A0' : typedChar}
-                  </span>
-                );
-              }
-              if (index === currentIndex) {
-                // 현재 입력 위치: 커서 표시 (글자 숨김)
-                return (
-                  <span key={index} className="typing-char typing-char--current">
+                  <span key={index} className="text-gray-400">
                     {targetChar === ' ' ? '\u00A0' : '●'}
                   </span>
                 );
-              }
-              // 아직 입력하지 않은 글자: 숨김
-              return (
-                <span key={index} className="typing-char typing-char--pending">
-                  {targetChar === ' ' ? '\u00A0' : '●'}
-                </span>
-              );
-            })}
-          </div>
-          <p className="text-center mt-2 text-sm text-[var(--color-text-muted)]">
-            {currentIndex} / {practiceText.length} 글자
-          </p>
-          {!isStarted && (
-            <p className="text-center mt-4 text-[var(--color-primary)] animate-pulse">
-              {language === 'en' ? 'Listen and start typing' : '들은 내용을 입력하세요'}
+              })}
+            </div>
+
+            <p className="text-center mb-4 text-sm text-[var(--color-text-muted)]">
+              {currentIndex} / {practiceText.length} 글자
             </p>
-          )}
-        </div>
+
+            {/* 입력 필드 (아래) */}
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={handleInputChange}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
+              disabled={isPaused || isComplete}
+              className="w-full p-4 text-xl border-2 border-[var(--color-border)] rounded-lg
+                       focus:border-[var(--color-primary)] focus:outline-none
+                       bg-[var(--color-surface)] font-mono"
+              placeholder={!isStarted ? (language === 'en' ? 'Type what you hear...' : '들은 내용을 입력하세요...') : ''}
+              autoFocus
+            />
+          </CardContent>
+        </Card>
 
         {/* 메트릭 표시 */}
         <MetricsDisplay metrics={metrics} className="mb-6" />

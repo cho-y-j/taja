@@ -1,212 +1,276 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { RotateCcw, ChevronLeft, ChevronRight, Volume2, VolumeX, Eye, EyeOff } from 'lucide-react';
+import { RotateCcw, Clock, Target, Zap, Trophy, Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { TypingDisplay } from '@/components/typing/typing-display';
-import { MetricsDisplay } from '@/components/typing/metrics-display';
-import { useTypingEngine } from '@/hooks/use-typing-engine';
-import { TypingInput } from '@/components/typing/typing-input';
 import { extractParagraphs } from '@/lib/documents/document-utils';
 import { getPreferredVoice } from '@/lib/speech/tts-utils';
+import { StarRating, getStarRating, getStarMessage } from '@/components/ui/star-rating';
 import type { UserDocument } from '@/stores/document-store';
+
+type ViewMode = 'time' | 'practice' | 'result';
+
+interface SessionStats {
+  totalParagraphs: number;
+  totalCharacters: number;
+  correctCharacters: number;
+  totalTime: number;
+}
 
 interface Props {
   document: UserDocument;
 }
 
 export function FullTextPracticeMode({ document: doc }: Props) {
-  const paragraphs = useMemo(() => extractParagraphs(doc.content), [doc.content]);
-  const [currentIdx, setCurrentIdx] = useState(0);
+  const allParagraphs = useMemo(() => extractParagraphs(doc.content), [doc.content]);
+
+  const [viewMode, setViewMode] = useState<ViewMode>('time');
+  const [practiceTime, setPracticeTime] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // Current paragraph
+  const [paragraphs, setParagraphs] = useState<string[]>([]);
+  const [currentParagraphIndex, setCurrentParagraphIndex] = useState(0);
+  const [currentParagraph, setCurrentParagraph] = useState('');
+  const [userInput, setUserInput] = useState('');
+  const [isStarted, setIsStarted] = useState(false);
+
+  // Real-time metrics
+  const [currentWpm, setCurrentWpm] = useState(0);
+
+  // Session stats
+  const [sessionStats, setSessionStats] = useState<SessionStats>({
+    totalParagraphs: 0,
+    totalCharacters: 0,
+    correctCharacters: 0,
+    totalTime: 0,
+  });
+
+  // Audio
   const [autoListen, setAutoListen] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [showTranslation, setShowTranslation] = useState(false);
-  const [translation, setTranslation] = useState<string | null>(null);
-  const [isTranslating, setIsTranslating] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const practiceText = paragraphs[currentIdx] || '';
+
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const wpmTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number>(0);
+  const isFinishedRef = useRef(false);
+  const isComposingRef = useRef(false);
 
   // Load voices
   useEffect(() => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
-
     const loadVoices = () => {
       const available = window.speechSynthesis.getVoices();
-      if (available.length > 0) {
-        setVoices(available);
-      }
+      if (available.length > 0) setVoices(available);
     };
-
     loadVoices();
     window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
-    return () => {
-      window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
-    };
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
   }, []);
 
-  // Cleanup on unmount
+  // Cleanup
   useEffect(() => {
     return () => {
       if (typeof window !== 'undefined' && window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (wpmTimerRef.current) clearInterval(wpmTimerRef.current);
     };
   }, []);
 
-  const {
-    metrics,
-    isComplete,
-    isPaused,
-    isStarted,
-    getCharacterFeedback,
-    reset,
-    pause,
-    resume,
-    inputRef,
-    processInput,
-    processBackspace,
-    startSession,
-  } = useTypingEngine(practiceText, 'document');
-
-  useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 100);
-  }, [currentIdx, inputRef]);
-
-  // Reset translation when paragraph changes
-  useEffect(() => {
-    setTranslation(null);
-  }, [currentIdx]);
-
-  // Speak function
-  const speakParagraph = useCallback(() => {
-    if (!practiceText || typeof window === 'undefined' || !window.speechSynthesis) return;
-
+  // Speak paragraph
+  const speakParagraph = useCallback((text: string) => {
+    if (!text || typeof window === 'undefined' || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(practiceText);
+    const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = doc.language === 'ko' ? 'ko-KR' : 'en-US';
-
     const voice = getPreferredVoice(voices, doc.language);
-    if (voice) {
-      utterance.voice = voice;
-    }
-
+    if (voice) utterance.voice = voice;
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
-
-    speechRef.current = utterance;
     window.speechSynthesis.speak(utterance);
-  }, [practiceText, doc.language, voices]);
+  }, [doc.language, voices]);
 
-  // Stop speaking
-  const stopSpeaking = useCallback(() => {
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
-    }
+  // Initialize paragraphs (순서대로)
+  const initializeParagraphs = useCallback(() => {
+    setParagraphs(allParagraphs);
+    setCurrentParagraphIndex(0);
+    setCurrentParagraph(allParagraphs[0] || '');
+  }, [allParagraphs]);
+
+  // Time selection
+  const handleTimeSelect = useCallback((seconds: number) => {
+    setPracticeTime(seconds);
+    setTimeRemaining(seconds);
+    initializeParagraphs();
+    setViewMode('practice');
+    setUserInput('');
+    setIsStarted(false);
+    setIsPaused(false);
+    setCurrentWpm(0);
+    isFinishedRef.current = false;
+    setSessionStats({ totalParagraphs: 0, totalCharacters: 0, correctCharacters: 0, totalTime: 0 });
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, [initializeParagraphs]);
+
+  // Finish session
+  const finishSession = useCallback(() => {
+    if (isFinishedRef.current) return;
+    isFinishedRef.current = true;
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (wpmTimerRef.current) { clearInterval(wpmTimerRef.current); wpmTimerRef.current = null; }
+    window.speechSynthesis?.cancel();
+    setSessionStats(prev => ({ ...prev, totalTime: Date.now() - startTimeRef.current }));
+    setViewMode('result');
   }, []);
 
-  // Auto-listen when paragraph changes
+  // Timer
   useEffect(() => {
-    if (autoListen && practiceText) {
-      speakParagraph();
-    }
-  }, [currentIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (viewMode !== 'practice' || !isStarted || isPaused) return;
 
-  // Auto-fetch translation when showTranslation is enabled
-  useEffect(() => {
-    if (showTranslation && !translation && !isTranslating) {
-      fetchTranslation();
-    }
-  }, [showTranslation, currentIdx]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleRestart = useCallback(() => {
-    reset();
-    setTimeout(() => inputRef.current?.focus(), 100);
-  }, [reset, inputRef]);
-
-  const handleNext = useCallback(() => {
-    if (currentIdx < paragraphs.length - 1) {
-      setCurrentIdx(currentIdx + 1);
-      reset();
-    }
-  }, [currentIdx, paragraphs.length, reset]);
-
-  const handlePrev = useCallback(() => {
-    if (currentIdx > 0) {
-      setCurrentIdx(currentIdx - 1);
-      reset();
-    }
-  }, [currentIdx, reset]);
-
-  // Enter → next paragraph when complete
-  useEffect(() => {
-    if (!isComplete) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        if (currentIdx < paragraphs.length - 1) {
-          setCurrentIdx(prev => prev + 1);
-          reset();
-        }
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [isComplete, currentIdx, paragraphs.length, reset]);
-
-  // Toggle auto-listen
-  const handleToggleAutoListen = useCallback(() => {
-    if (autoListen) {
-      stopSpeaking();
-      setAutoListen(false);
-    } else {
-      setAutoListen(true);
-      speakParagraph();
-    }
-  }, [autoListen, speakParagraph, stopSpeaking]);
-
-  const fetchTranslation = useCallback(async () => {
-    setIsTranslating(true);
-    try {
-      const from = doc.language === 'ko' ? 'ko' : 'en';
-      const to = doc.language === 'ko' ? 'en' : 'ko';
-      const res = await fetch('/api/ai/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: practiceText, from, to }),
+    timerRef.current = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) { finishSession(); return 0; }
+        return prev - 1;
       });
-      if (res.ok) {
-        const data = await res.json();
-        setTranslation(data.translation);
-      }
-    } catch {
-      // silently fail
-    } finally {
-      setIsTranslating(false);
-    }
-  }, [practiceText, doc.language]);
+    }, 1000);
 
-  const handleTranslate = useCallback(() => {
-    if (!showTranslation) {
-      setShowTranslation(true);
-      if (!translation && !isTranslating) {
-        fetchTranslation();
+    wpmTimerRef.current = setInterval(() => {
+      if (startTimeRef.current > 0) {
+        setSessionStats(stats => {
+          const elapsed = (Date.now() - startTimeRef.current) / 60000;
+          if (elapsed > 0 && stats.correctCharacters > 0) {
+            setCurrentWpm(Math.round((stats.correctCharacters / 5) / elapsed));
+          }
+          return stats;
+        });
       }
+    }, 500);
+
+    return () => {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      if (wpmTimerRef.current) { clearInterval(wpmTimerRef.current); wpmTimerRef.current = null; }
+    };
+  }, [viewMode, isStarted, isPaused, finishSession]);
+
+  // Move to next paragraph
+  const moveToNextParagraph = useCallback(() => {
+    const nextIndex = currentParagraphIndex + 1;
+    if (nextIndex < paragraphs.length) {
+      setCurrentParagraphIndex(nextIndex);
+      setCurrentParagraph(paragraphs[nextIndex]);
+      if (autoListen) speakParagraph(paragraphs[nextIndex]);
     } else {
-      setShowTranslation(false);
+      // 다시 처음부터
+      setCurrentParagraphIndex(0);
+      setCurrentParagraph(paragraphs[0] || '');
+      if (autoListen) speakParagraph(paragraphs[0]);
     }
-  }, [showTranslation, translation, isTranslating, fetchTranslation]);
+    setUserInput('');
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, [currentParagraphIndex, paragraphs, autoListen, speakParagraph]);
 
-  // 진행률
-  const progress = Math.round(
-    ((currentIdx + (isComplete ? 1 : 0)) / paragraphs.length) * 100
-  );
+  // Input handlers
+  const handleCompositionStart = useCallback(() => { isComposingRef.current = true; }, []);
 
-  if (paragraphs.length === 0) {
+  const handleCompositionEnd = useCallback((e: React.CompositionEvent<HTMLTextAreaElement>) => {
+    isComposingRef.current = false;
+    const value = e.currentTarget.value;
+    setUserInput(value);
+    checkParagraphCompletion(value);
+  }, []);
+
+  const checkParagraphCompletion = useCallback((value: string) => {
+    if (isFinishedRef.current || !currentParagraph) return;
+
+    if (value.length >= currentParagraph.length) {
+      let correct = 0;
+      for (let i = 0; i < currentParagraph.length; i++) {
+        if (value[i] === currentParagraph[i]) correct++;
+      }
+
+      setSessionStats(prev => {
+        const newStats = {
+          ...prev,
+          totalParagraphs: prev.totalParagraphs + 1,
+          totalCharacters: prev.totalCharacters + currentParagraph.length,
+          correctCharacters: prev.correctCharacters + correct,
+        };
+        const elapsed = (Date.now() - startTimeRef.current) / 60000;
+        if (elapsed > 0) setCurrentWpm(Math.round((newStats.correctCharacters / 5) / elapsed));
+        return newStats;
+      });
+
+      setTimeout(() => moveToNextParagraph(), 200);
+    }
+  }, [currentParagraph, moveToNextParagraph]);
+
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setUserInput(value);
+
+    if (!isStarted && value.length > 0) {
+      setIsStarted(true);
+      startTimeRef.current = Date.now();
+    }
+
+    if (isComposingRef.current) return;
+    checkParagraphCompletion(value);
+  }, [isStarted, checkParagraphCompletion]);
+
+  // Pause/Resume
+  const togglePause = useCallback(() => setIsPaused(prev => !prev), []);
+
+  // Restart
+  const handleRestart = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (wpmTimerRef.current) clearInterval(wpmTimerRef.current);
+    window.speechSynthesis?.cancel();
+    setViewMode('time');
+    isFinishedRef.current = false;
+  }, []);
+
+  // Format time
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Get results
+  const getResults = () => {
+    const accuracy = sessionStats.totalCharacters > 0
+      ? Math.round((sessionStats.correctCharacters / sessionStats.totalCharacters) * 100)
+      : 0;
+    const minutes = practiceTime / 60;
+    const wpm = minutes > 0 ? Math.round((sessionStats.correctCharacters / 5) / minutes) : 0;
+    return { accuracy, wpm };
+  };
+
+  // Character feedback
+  const getCharacterFeedback = () => {
+    return currentParagraph.split('').map((char, index) => {
+      if (index < userInput.length) {
+        return { char, status: userInput[index] === char ? 'correct' : 'incorrect' };
+      }
+      if (index === userInput.length) return { char, status: 'current' };
+      return { char, status: 'pending' };
+    });
+  };
+
+  const getCurrentAccuracy = () => {
+    if (sessionStats.totalCharacters === 0) return 100;
+    return Math.round((sessionStats.correctCharacters / sessionStats.totalCharacters) * 100);
+  };
+
+  // Empty document
+  if (allParagraphs.length === 0) {
     return (
       <Card>
         <CardContent className="py-12 text-center">
@@ -216,133 +280,214 @@ export function FullTextPracticeMode({ document: doc }: Props) {
     );
   }
 
-  return (
-    <div>
-      {/* 진행 바 */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-sm text-[var(--color-text-muted)]">
-            문단 {currentIdx + 1} / {paragraphs.length}
-          </p>
-          <p className="text-sm font-medium text-[var(--color-primary)]">
-            {progress}% 완료
-          </p>
+  // Time selection screen
+  if (viewMode === 'time') {
+    const timeOptions = [
+      { seconds: 60, label: '1분' },
+      { seconds: 180, label: '3분' },
+      { seconds: 300, label: '5분' },
+    ];
+
+    return (
+      <div className="text-center py-8">
+        <h3 className="text-xl font-bold mb-2">연습 시간을 선택하세요</h3>
+        <p className="text-[var(--color-text-muted)] mb-6">
+          문단 {allParagraphs.length}개 | 시간이 끝나면 결과를 보여드려요
+        </p>
+        <div className="flex justify-center gap-4">
+          {timeOptions.map(({ seconds, label }) => (
+            <Card
+              key={seconds}
+              className="cursor-pointer hover:shadow-lg transition-all hover:scale-105 w-32"
+              onClick={() => handleTimeSelect(seconds)}
+            >
+              <CardContent className="py-6 text-center">
+                <Clock className="w-8 h-8 mx-auto mb-2 text-[var(--color-primary)]" />
+                <p className="text-xl font-bold">{label}</p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-        <div className="w-full h-2 bg-[var(--color-border)] rounded-full overflow-hidden">
+      </div>
+    );
+  }
+
+  // Practice screen
+  if (viewMode === 'practice') {
+    const feedback = getCharacterFeedback();
+    const progressPercent = practiceTime > 0 ? ((practiceTime - timeRemaining) / practiceTime) * 100 : 0;
+    const isUrgent = timeRemaining <= 10;
+
+    return (
+      <div>
+        {/* Progress bar */}
+        <div className="h-1 bg-gray-200 mb-4 rounded-full overflow-hidden">
           <div
-            className="h-full bg-[var(--color-primary)] rounded-full transition-all"
-            style={{ width: `${progress}%` }}
+            className="h-full bg-[var(--color-primary)] transition-all duration-1000"
+            style={{ width: `${progressPercent}%` }}
           />
         </div>
-      </div>
 
-      {/* 네비게이션 */}
-      <div className="flex items-center justify-end gap-2 mb-4">
-        <Button
-          variant={autoListen ? 'primary' : 'outline'}
-          size="sm"
-          onClick={handleToggleAutoListen}
-        >
-          {isSpeaking ? (
-            <VolumeX className="w-4 h-4" />
-          ) : (
-            <Volume2 className="w-4 h-4" />
-          )}
-        </Button>
-        <Button
-          variant={showTranslation ? 'primary' : 'outline'}
-          size="sm"
-          onClick={handleTranslate}
-          disabled={isTranslating}
-        >
-          {showTranslation ? (
-            <EyeOff className="w-4 h-4" />
-          ) : (
-            <Eye className="w-4 h-4" />
-          )}
-        </Button>
-        <Button variant="outline" size="sm" onClick={handlePrev} disabled={currentIdx === 0}>
-          <ChevronLeft className="w-4 h-4" />
-        </Button>
-        <Button variant="outline" size="sm" onClick={handleNext} disabled={currentIdx >= paragraphs.length - 1}>
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-      </div>
+        {/* Stats panel */}
+        <div className="grid grid-cols-4 gap-3 mb-4">
+          <div className={`col-span-2 rounded-xl p-3 text-center transition-all ${
+            isUrgent ? 'bg-red-100 border-2 border-red-400 animate-pulse' : 'bg-[var(--color-surface)] border border-[var(--color-border)]'
+          }`}>
+            <div className="flex items-center justify-center gap-2">
+              <Clock className={`w-5 h-5 ${isUrgent ? 'text-red-600' : 'text-[var(--color-primary)]'}`} />
+              <span className={`text-3xl font-mono font-bold ${isUrgent ? 'text-red-600' : ''}`}>
+                {formatTime(timeRemaining)}
+              </span>
+            </div>
+            <p className="text-xs text-[var(--color-text-muted)]">남은 시간</p>
+          </div>
+          <div className="rounded-xl p-3 text-center bg-[var(--color-surface)] border border-[var(--color-border)]">
+            <div className="flex items-center justify-center gap-1">
+              <Zap className="w-4 h-4 text-[var(--color-secondary)]" />
+              <span className="text-2xl font-bold text-[var(--color-secondary)]">{currentWpm}</span>
+            </div>
+            <p className="text-xs text-[var(--color-text-muted)]">WPM</p>
+          </div>
+          <div className="rounded-xl p-3 text-center bg-[var(--color-surface)] border border-[var(--color-border)]">
+            <div className="flex items-center justify-center gap-1">
+              <Target className="w-4 h-4 text-[var(--color-success)]" />
+              <span className="text-2xl font-bold text-[var(--color-success)]">{getCurrentAccuracy()}%</span>
+            </div>
+            <p className="text-xs text-[var(--color-text-muted)]">정확도</p>
+          </div>
+        </div>
 
-      {/* 번역 표시 */}
-      {showTranslation && translation && (
+        {/* Paragraph count */}
         <div className="text-center mb-4">
-          <span className="inline-block px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-lg font-medium">
-            {translation}
+          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--color-primary-light)] text-[var(--color-primary)] text-sm">
+            <Trophy className="w-4 h-4" />
+            완료: {sessionStats.totalParagraphs}문단 | 현재: {currentParagraphIndex + 1}/{paragraphs.length}
           </span>
         </div>
-      )}
 
-      {/* 타이핑 영역 */}
-      <div onClick={() => inputRef.current?.focus()} className="cursor-text relative mb-6">
-        <TypingInput
-          language={doc.language}
-          isComplete={isComplete}
-          isPaused={isPaused}
-          isStarted={isStarted}
-          processInput={processInput}
-          processBackspace={processBackspace}
-          startSession={startSession}
-          inputRef={inputRef}
-        />
-        <TypingDisplay feedback={getCharacterFeedback()} />
-        {!isStarted && (
-          <p className="text-center mt-4 text-[var(--color-primary)] animate-pulse">
-            클릭하고 타이핑을 시작하세요
-          </p>
+        {/* Pause overlay */}
+        {isPaused && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <Card className="p-8 text-center">
+              <Pause className="w-16 h-16 mx-auto mb-4 text-[var(--color-primary)]" />
+              <h2 className="text-2xl font-bold mb-4">일시정지</h2>
+              <Button onClick={togglePause} size="lg">
+                <Play className="w-5 h-5 mr-2" />
+                계속하기
+              </Button>
+            </Card>
+          </div>
         )}
-      </div>
 
-      <MetricsDisplay metrics={metrics} className="mb-6" />
+        {/* Typing area */}
+        <Card className="mb-4">
+          <CardContent className="py-6">
+            {/* Target paragraph */}
+            <div className="text-lg leading-relaxed mb-6 font-mono tracking-wide min-h-[100px] max-h-[200px] overflow-auto">
+              {feedback.map((item, index) => (
+                <span
+                  key={index}
+                  className={`${
+                    item.status === 'correct' ? 'text-green-600'
+                    : item.status === 'incorrect' ? 'text-red-500 bg-red-100'
+                    : item.status === 'current' ? 'bg-yellow-300 animate-pulse'
+                    : 'text-gray-400'
+                  }`}
+                >
+                  {item.char === ' ' ? '\u00A0' : item.char}
+                </span>
+              ))}
+            </div>
 
-      <div className="flex justify-center gap-4">
-        {!isComplete && isStarted && (
-          <Button variant="outline" onClick={isPaused ? resume : pause}>
-            {isPaused ? '계속' : '일시정지'}
-          </Button>
-        )}
-        <Button variant="outline" onClick={handleRestart}>
-          <RotateCcw className="w-4 h-4 mr-2" />
-          다시 연습
-        </Button>
-      </div>
-
-      {isComplete && (
-        <Card className="mt-6 border-green-500 bg-green-50">
-          <CardContent className="py-6 text-center">
-            {currentIdx < paragraphs.length - 1 ? (
-              <>
-                <h3 className="text-xl font-bold text-green-700 mb-2">문단 완료!</h3>
-                <p className="text-green-600 mb-2">
-                  정확도 {metrics.accuracy}% | {metrics.wpm} WPM
-                </p>
-                <p className="text-sm text-green-600 mb-4">
-                  Enter를 누르면 다음 문단으로 이동합니다
-                </p>
-                <div className="flex justify-center gap-4">
-                  <Button variant="outline" onClick={handleRestart}>다시 연습</Button>
-                  <Button onClick={handleNext} className="bg-green-600 hover:bg-green-700">
-                    다음 문단
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h3 className="text-xl font-bold text-green-700 mb-2">전체 문서 완료!</h3>
-                <p className="text-green-600 mb-4">
-                  정확도 {metrics.accuracy}% | {metrics.wpm} WPM
-                </p>
-                <Button variant="outline" onClick={handleRestart}>다시 연습</Button>
-              </>
-            )}
+            {/* Input */}
+            <textarea
+              ref={inputRef}
+              value={userInput}
+              onChange={handleInputChange}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
+              disabled={isPaused}
+              className="w-full p-4 text-lg border-2 border-[var(--color-border)] rounded-lg
+                       focus:border-[var(--color-primary)] focus:outline-none
+                       bg-[var(--color-surface)] font-mono min-h-[100px] resize-none"
+              placeholder={!isStarted ? '타이핑을 시작하면 타이머가 시작됩니다' : ''}
+              autoFocus
+            />
           </CardContent>
         </Card>
-      )}
-    </div>
-  );
+
+        {/* Controls */}
+        <div className="flex justify-center gap-3">
+          <Button variant="outline" size="sm" onClick={togglePause}>
+            {isPaused ? <Play className="w-4 h-4 mr-1" /> : <Pause className="w-4 h-4 mr-1" />}
+            {isPaused ? '계속' : '일시정지'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setAutoListen(!autoListen); if (!autoListen) speakParagraph(currentParagraph); }}
+          >
+            {autoListen ? <VolumeX className="w-4 h-4 mr-1" /> : <Volume2 className="w-4 h-4 mr-1" />}
+            {autoListen ? '음성 끄기' : '음성 듣기'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleRestart}>
+            <RotateCcw className="w-4 h-4 mr-1" />
+            다시 시작
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Result screen
+  if (viewMode === 'result') {
+    const { accuracy, wpm } = getResults();
+    const stars = getStarRating(accuracy);
+    const message = getStarMessage(stars);
+
+    return (
+      <div className="py-8">
+        <Card className="max-w-lg mx-auto">
+          <CardContent className="py-8 text-center">
+            <h2 className="text-2xl font-bold mb-4">{message}</h2>
+            <div className="mb-6">
+              <StarRating rating={stars} size="lg" animated />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 mb-8">
+              <div className="text-center">
+                <Zap className="w-5 h-5 mx-auto text-[var(--color-primary)]" />
+                <p className="text-3xl font-bold">{wpm}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">WPM</p>
+              </div>
+              <div className="text-center">
+                <Target className="w-5 h-5 mx-auto text-[var(--color-success)]" />
+                <p className="text-3xl font-bold">{accuracy}%</p>
+                <p className="text-xs text-[var(--color-text-muted)]">정확도</p>
+              </div>
+              <div className="text-center">
+                <Trophy className="w-5 h-5 mx-auto text-[var(--color-secondary)]" />
+                <p className="text-3xl font-bold">{sessionStats.totalParagraphs}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">문단</p>
+              </div>
+            </div>
+
+            <div className="text-sm text-[var(--color-text-muted)] mb-6">
+              <p>총 {sessionStats.totalCharacters}자 입력</p>
+              <p>연습 시간: {formatTime(practiceTime)}</p>
+            </div>
+
+            <div className="flex justify-center gap-3">
+              <Button variant="outline" onClick={handleRestart}>
+                <RotateCcw className="w-4 h-4 mr-2" />
+                다시 연습
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return null;
 }

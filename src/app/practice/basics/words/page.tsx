@@ -1,16 +1,14 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, RotateCcw, Play, Home, X, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { TypingDisplay } from '@/components/typing/typing-display';
 import { MetricsDisplay } from '@/components/typing/metrics-display';
 import { useTypingEngine } from '@/hooks/use-typing-engine';
 import { wordLevels, generateWordPracticeText } from '@/lib/typing/word-practice';
-import { engToKorMap } from '@/lib/typing/korean-keyboard';
 
 type Language = 'en' | 'ko';
 
@@ -36,54 +34,67 @@ export default function WordPracticePage() {
     isComplete,
     isPaused,
     isStarted,
+    userInput,
     getCharacterFeedback,
-    handleKeyDown: originalHandleKeyDown,
     reset,
     pause,
     resume,
-    inputRef,
     processInput,
     processBackspace,
     startSession,
   } = useTypingEngine(practiceText, 'words');
 
-  // 한글 입력 처리를 위한 커스텀 핸들러
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (isComplete || isPaused) return;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isComposingRef = useRef(false);
+  const [inputValue, setInputValue] = useState('');
 
-      // 백스페이스 처리
-      if (e.key === 'Backspace') {
-        e.preventDefault();
+  // userInput이 리셋되면 inputValue도 리셋
+  useEffect(() => {
+    if (userInput === '') {
+      setInputValue('');
+    }
+  }, [userInput]);
+
+  // 한글 IME 조합 시작
+  const handleCompositionStart = useCallback(() => {
+    isComposingRef.current = true;
+  }, []);
+
+  // 한글 IME 조합 완료
+  const handleCompositionEnd = useCallback((e: React.CompositionEvent<HTMLInputElement>) => {
+    isComposingRef.current = false;
+    const value = e.currentTarget.value;
+    setInputValue(value);
+
+    const currentLen = userInput.length;
+    for (let i = currentLen; i < value.length; i++) {
+      processInput(value[i]);
+    }
+  }, [userInput, processInput]);
+
+  // 입력 변경 처리
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+
+    if (!isStarted && value.length > 0) {
+      startSession();
+    }
+
+    if (isComposingRef.current) return;
+
+    if (value.length < userInput.length) {
+      const diff = userInput.length - value.length;
+      for (let i = 0; i < diff; i++) {
         processBackspace();
-        return;
       }
+      return;
+    }
 
-      // 특수 키 무시
-      if (e.key.length !== 1) return;
-
-      e.preventDefault();
-
-      // 첫 입력 시 자동 시작
-      if (!isStarted) {
-        startSession();
-      }
-
-      if (language === 'ko') {
-        // 한글 모드: 영문 키 -> 한글로 변환
-        const koreanKey = e.key === ' ' ? ' ' : engToKorMap[e.key.toLowerCase()];
-        if (koreanKey) {
-          processInput(koreanKey);
-        } else if (e.key === ' ') {
-          processInput(' ');
-        }
-      } else {
-        // 영문 모드
-        processInput(e.key);
-      }
-    },
-    [isComplete, isPaused, isStarted, language, processInput, processBackspace, startSession]
-  );
+    for (let i = userInput.length; i < value.length; i++) {
+      processInput(value[i]);
+    }
+  }, [isStarted, userInput, processInput, processBackspace, startSession]);
 
   // 연습 화면 진입 시 자동 포커스
   useEffect(() => {
@@ -259,25 +270,46 @@ export default function WordPracticePage() {
           </CardHeader>
         </Card>
 
-        {/* 타이핑 영역 (클릭하면 포커스) */}
-        <div onClick={() => inputRef.current?.focus()} className="cursor-text relative mb-6">
-          <input
-            ref={inputRef}
-            type="text"
-            value=""
-            onChange={() => {}}
-            className="absolute opacity-0 w-0 h-0"
-            onKeyDown={handleKeyDown}
-            aria-label="타이핑 입력"
-            autoFocus
-          />
-          <TypingDisplay feedback={getCharacterFeedback()} />
-          {!isStarted && (
-            <p className="text-center mt-4 text-[var(--color-primary)] animate-pulse">
-              {language === 'en' ? 'Click here and start typing' : '여기를 클릭하고 타이핑을 시작하세요'}
-            </p>
-          )}
-        </div>
+        {/* 타이핑 영역 */}
+        <Card className="mb-6">
+          <CardContent className="py-6">
+            {/* 목표 텍스트 (위) */}
+            <div className="text-2xl leading-relaxed mb-6 font-mono tracking-wide min-h-[60px] text-center">
+              {getCharacterFeedback().map((item, index) => (
+                <span
+                  key={index}
+                  className={`${
+                    item.status === 'correct'
+                      ? 'text-green-600'
+                      : item.status === 'incorrect'
+                      ? 'text-red-500 bg-red-100'
+                      : item.status === 'current'
+                      ? 'bg-yellow-300 text-[var(--color-text)] animate-pulse'
+                      : 'text-gray-400'
+                  }`}
+                >
+                  {item.char === ' ' ? '\u00A0' : item.char}
+                </span>
+              ))}
+            </div>
+
+            {/* 입력 필드 (아래) */}
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={handleInputChange}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
+              disabled={isPaused || isComplete}
+              className="w-full p-4 text-xl border-2 border-[var(--color-border)] rounded-lg
+                       focus:border-[var(--color-primary)] focus:outline-none
+                       bg-[var(--color-surface)] font-mono"
+              placeholder={!isStarted ? (language === 'en' ? 'Start typing here...' : '여기에 입력하세요...') : ''}
+              autoFocus
+            />
+          </CardContent>
+        </Card>
 
         {/* 메트릭 표시 */}
         <MetricsDisplay metrics={metrics} className="mb-6" />

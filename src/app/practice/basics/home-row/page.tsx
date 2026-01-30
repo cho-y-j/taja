@@ -1,18 +1,17 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, RotateCcw, Play, Home, X, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { TypingDisplay } from '@/components/typing/typing-display';
 import { KeyboardGuide } from '@/components/typing/keyboard-guide';
 import { KoreanKeyboardGuide } from '@/components/typing/korean-keyboard-guide';
 import { HandGuide } from '@/components/typing/hand-guide';
 import { useTypingEngine } from '@/hooks/use-typing-engine';
 import { rowLevels, rowNames, generateRowPracticeText, type KeyboardRow } from '@/lib/typing/keyboard-practice';
-import { koreanRowLevels, koreanRowNames, generateKoreanPracticeText, engToKorMap } from '@/lib/typing/korean-keyboard';
+import { koreanRowLevels, koreanRowNames, generateKoreanPracticeText } from '@/lib/typing/korean-keyboard';
 
 type Language = 'en' | 'ko';
 
@@ -42,44 +41,74 @@ export default function KeyboardPracticePage() {
     isComplete,
     isPaused,
     isStarted,
+    userInput,
     getCharacterFeedback,
     getNextKey,
-    handleKeyDown: originalHandleKeyDown,
     reset,
     pause,
     resume,
-    inputRef,
     processInput,
     processBackspace,
     startSession,
   } = useTypingEngine(practiceText, 'home-row');
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (isComplete || isPaused) return;
-      if (e.key === 'Backspace') {
-        e.preventDefault();
-        processBackspace();
-        return;
-      }
-      if (e.key.length !== 1) return;
-      e.preventDefault();
-      if (!isStarted) startSession();
-      if (language === 'ko') {
-        const koreanKey = e.key === ' ' ? ' ' : engToKorMap[e.key.toLowerCase()];
-        if (koreanKey) processInput(koreanKey);
-      } else {
-        processInput(e.key);
-      }
-    },
-    [isComplete, isPaused, isStarted, language, processInput, processBackspace, startSession]
-  );
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isComposingRef = useRef(false);
+  const [inputValue, setInputValue] = useState('');
 
   useEffect(() => {
     if (!showRowSelect && inputRef.current) {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [showRowSelect, inputRef]);
+  }, [showRowSelect]);
+
+  // userInput이 리셋되면 inputValue도 리셋
+  useEffect(() => {
+    if (userInput === '') {
+      setInputValue('');
+    }
+  }, [userInput]);
+
+  // 한글 IME 조합 시작
+  const handleCompositionStart = useCallback(() => {
+    isComposingRef.current = true;
+  }, []);
+
+  // 한글 IME 조합 완료
+  const handleCompositionEnd = useCallback((e: React.CompositionEvent<HTMLInputElement>) => {
+    isComposingRef.current = false;
+    const value = e.currentTarget.value;
+    setInputValue(value);
+
+    const currentLen = userInput.length;
+    for (let i = currentLen; i < value.length; i++) {
+      processInput(value[i]);
+    }
+  }, [userInput, processInput]);
+
+  // 입력 변경 처리
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+
+    if (!isStarted && value.length > 0) {
+      startSession();
+    }
+
+    if (isComposingRef.current) return;
+
+    if (value.length < userInput.length) {
+      const diff = userInput.length - value.length;
+      for (let i = 0; i < diff; i++) {
+        processBackspace();
+      }
+      return;
+    }
+
+    for (let i = userInput.length; i < value.length; i++) {
+      processInput(value[i]);
+    }
+  }, [isStarted, userInput, processInput, processBackspace, startSession]);
 
   const handleStart = useCallback(() => {
     setShowRowSelect(false);
@@ -347,23 +376,42 @@ export default function KeyboardPracticePage() {
       {/* ── Main content (flex-1, no scroll) ── */}
       <main className="flex-1 flex flex-col min-h-0 px-4 py-2 max-w-6xl mx-auto w-full">
         {/* Typing area - relative for overlay */}
-        <div className="relative shrink-0 mb-2 cursor-text" onClick={() => inputRef.current?.focus()}>
+        <div className="relative shrink-0 mb-2">
+          {/* 목표 텍스트 (위) */}
+          <div className="text-lg leading-[2] p-3 bg-[var(--color-surface)] rounded-lg border border-[var(--color-border)] mb-2 font-mono tracking-wide max-h-24 overflow-auto">
+            {getCharacterFeedback().map((item, index) => (
+              <span
+                key={index}
+                className={`${
+                  item.status === 'correct'
+                    ? 'text-green-600'
+                    : item.status === 'incorrect'
+                    ? 'text-red-500 bg-red-100'
+                    : item.status === 'current'
+                    ? 'bg-yellow-300 text-[var(--color-text)] animate-pulse'
+                    : 'text-gray-400'
+                }`}
+              >
+                {item.char === ' ' ? '\u00A0' : item.char}
+              </span>
+            ))}
+          </div>
+
+          {/* 입력 필드 (아래) */}
           <input
             ref={inputRef}
             type="text"
-            value=""
-            onChange={() => {}}
-            className="absolute opacity-0 w-0 h-0"
-            onKeyDown={handleKeyDown}
-            aria-label="타이핑 입력"
+            value={inputValue}
+            onChange={handleInputChange}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
+            disabled={isPaused || isComplete}
+            className="w-full p-3 text-lg border-2 border-[var(--color-border)] rounded-lg
+                     focus:border-[var(--color-primary)] focus:outline-none
+                     bg-[var(--color-surface)] font-mono"
+            placeholder={!isStarted ? (language === 'en' ? 'Start typing...' : '타이핑 시작...') : ''}
             autoFocus
           />
-          <TypingDisplay feedback={getCharacterFeedback()} className="!max-h-24 !text-lg !leading-[2] !p-3" />
-          {!isStarted && !isComplete && (
-            <p className="text-center mt-1 text-xs text-[var(--color-primary)] animate-pulse">
-              {language === 'en' ? 'Click here and start typing' : '여기를 클릭하고 타이핑을 시작하세요'}
-            </p>
-          )}
 
           {/* ── Completion overlay ── */}
           {isComplete && (
