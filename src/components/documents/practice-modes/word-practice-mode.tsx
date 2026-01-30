@@ -8,7 +8,7 @@ import { extractWords } from '@/lib/documents/document-utils';
 import { getPreferredVoice } from '@/lib/speech/tts-utils';
 import { StarRating, getStarRating, getStarMessage } from '@/components/ui/star-rating';
 import { playErrorSound, playKeySound } from '@/lib/utils/sound';
-import type { UserDocument } from '@/stores/document-store';
+import { useDocumentStore, type UserDocument } from '@/stores/document-store';
 
 type ViewMode = 'time' | 'practice' | 'result';
 
@@ -24,6 +24,7 @@ interface Props {
 }
 
 export function WordPracticeMode({ document: doc }: Props) {
+  const { addTranslation, getTranslation } = useDocumentStore();
   const allWords = useMemo(() => extractWords(doc.content), [doc.content]);
 
   const [viewMode, setViewMode] = useState<ViewMode>('time');
@@ -165,9 +166,17 @@ export function WordPracticeMode({ document: doc }: Props) {
     };
   }, [viewMode, isStarted, isPaused, finishSession]);
 
-  // Fetch translation for word
+  // Fetch translation for word (with cache)
   const fetchTranslation = useCallback(async (word: string) => {
     if (!word) return;
+
+    // 캐시 확인
+    const cached = getTranslation(doc.id, word);
+    if (cached) {
+      setTranslation(cached);
+      return;
+    }
+
     setTranslation('번역 중...');
     try {
       const response = await fetch('/api/ai/translate', {
@@ -182,13 +191,15 @@ export function WordPracticeMode({ document: doc }: Props) {
       const data = await response.json();
       if (data.translation) {
         setTranslation(data.translation);
+        // 캐시에 저장
+        addTranslation(doc.id, word, data.translation);
       } else {
         setTranslation('번역 실패');
       }
     } catch {
       setTranslation('번역 오류');
     }
-  }, [doc.language]);
+  }, [doc.id, doc.language, getTranslation, addTranslation]);
 
   // Move to next word
   const moveToNextWord = useCallback(() => {

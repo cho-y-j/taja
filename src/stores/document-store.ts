@@ -10,6 +10,8 @@ export interface UserDocument {
   aiPrompt?: string;
   translation?: string;
   summary?: string;
+  // 번역 캐시: { "원문": "번역" }
+  translationCache?: Record<string, string>;
   createdAt: string;
   updatedAt: string;
 }
@@ -59,6 +61,10 @@ interface DocumentActions {
   ) => UserDocument;
   updateDocument: (id: string, updates: Partial<UserDocument>) => void;
   deleteDocument: (id: string) => void;
+
+  // 번역 캐시
+  addTranslation: (docId: string, original: string, translated: string) => void;
+  getTranslation: (docId: string, original: string) => string | undefined;
 
   setDraft: (name: string, content: string, language: 'en' | 'ko') => void;
   clearDraft: () => void;
@@ -164,6 +170,26 @@ export const useDocumentStore = create<DocumentState & DocumentActions>()(
             state.selectedDocumentId === id ? null : state.selectedDocumentId,
           viewMode: state.selectedDocumentId === id ? 'list' : state.viewMode,
         })),
+
+      addTranslation: (docId, original, translated) =>
+        set((state) => ({
+          documents: state.documents.map((d) =>
+            d.id === docId
+              ? {
+                  ...d,
+                  translationCache: {
+                    ...d.translationCache,
+                    [original]: translated,
+                  },
+                }
+              : d
+          ),
+        })),
+
+      getTranslation: (docId, original) => {
+        const doc = get().documents.find((d) => d.id === docId);
+        return doc?.translationCache?.[original];
+      },
 
       setDraft: (name, content, language) =>
         set({ draftName: name, draftContent: content, draftLanguage: language }),

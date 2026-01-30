@@ -8,7 +8,7 @@ import { extractSentences } from '@/lib/documents/document-utils';
 import { getPreferredVoice } from '@/lib/speech/tts-utils';
 import { StarRating, getStarRating, getStarMessage } from '@/components/ui/star-rating';
 import { playErrorSound, playKeySound } from '@/lib/utils/sound';
-import type { UserDocument } from '@/stores/document-store';
+import { useDocumentStore, type UserDocument } from '@/stores/document-store';
 
 type ViewMode = 'time' | 'practice' | 'result';
 
@@ -24,6 +24,7 @@ interface Props {
 }
 
 export function SentencePracticeMode({ document: doc }: Props) {
+  const { addTranslation, getTranslation } = useDocumentStore();
   const allSentences = useMemo(() => extractSentences(doc.content), [doc.content]);
 
   const [viewMode, setViewMode] = useState<ViewMode>('time');
@@ -166,9 +167,17 @@ export function SentencePracticeMode({ document: doc }: Props) {
     };
   }, [viewMode, isStarted, isPaused, finishSession]);
 
-  // Fetch translation for sentence
+  // Fetch translation for sentence (with cache)
   const fetchTranslation = useCallback(async (text: string) => {
     if (!text) return;
+
+    // 캐시 확인
+    const cached = getTranslation(doc.id, text);
+    if (cached) {
+      setTranslation(cached);
+      return;
+    }
+
     setTranslation('번역 중...');
     try {
       const response = await fetch('/api/ai/translate', {
@@ -183,13 +192,15 @@ export function SentencePracticeMode({ document: doc }: Props) {
       const data = await response.json();
       if (data.translation) {
         setTranslation(data.translation);
+        // 캐시에 저장
+        addTranslation(doc.id, text, data.translation);
       } else {
         setTranslation('번역 실패');
       }
     } catch {
       setTranslation('번역 오류');
     }
-  }, [doc.language]);
+  }, [doc.id, doc.language, getTranslation, addTranslation]);
 
   // Move to next sentence
   const moveToNextSentence = useCallback(() => {
