@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { db, users } from '@/lib/db';
+import { eq } from 'drizzle-orm';
+import { checkAndDeductCredits, estimateTokens } from '@/lib/credits';
 
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 
@@ -19,6 +23,37 @@ export async function POST(request: NextRequest) {
         { error: 'API 키가 설정되지 않았습니다' },
         { status: 500 }
       );
+    }
+
+    // 로그인된 사용자인 경우 크레딧 체크
+    const { userId: clerkId } = await auth();
+
+    if (clerkId) {
+      const user = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkId, clerkId))
+        .limit(1);
+
+      if (user.length > 0) {
+        const tokens = estimateTokens(content);
+        const creditCheck = await checkAndDeductCredits(
+          user[0].id,
+          tokens,
+          '/api/ai/summarize'
+        );
+
+        if (!creditCheck.allowed) {
+          return NextResponse.json(
+            {
+              error: 'CREDITS_DEPLETED',
+              message: '크레딧이 부족합니다. 충전하거나 구독해주세요.',
+              balance: creditCheck.balance,
+            },
+            { status: 402 }
+          );
+        }
+      }
     }
 
     const systemPrompt =

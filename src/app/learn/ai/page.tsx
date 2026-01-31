@@ -16,6 +16,7 @@ import {
 import { useThemeStore } from '@/stores/theme-store';
 import { useDocumentStore } from '@/stores/document-store';
 import { useDocumentSync } from '@/hooks/use-document-sync';
+import { CreditBalance, UpgradeModal } from '@/components/credits';
 
 export default function AILearningPage() {
   const router = useRouter();
@@ -55,6 +56,9 @@ export default function AILearningPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
+      {/* 업그레이드 모달 */}
+      <UpgradeModal />
+
       {/* 헤더 */}
       <header className="sticky top-0 z-10 bg-[var(--color-surface)] border-b border-[var(--color-border-light)] shadow-sm">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-4">
@@ -69,6 +73,7 @@ export default function AILearningPage() {
               {documents.length}개의 문서
             </p>
           </div>
+          <CreditBalance />
         </div>
       </header>
 

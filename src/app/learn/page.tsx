@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useThemeStore } from '@/stores/theme-store';
 import { UserMenu } from '@/components/layout/user-menu';
+import { CreditBalance, UpgradeModal } from '@/components/credits';
 
 // Clerk가 설정되어 있는지 확인
 const CLERK_CONFIGURED = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
@@ -68,6 +69,9 @@ export default function LearnPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
+      {/* 업그레이드 모달 */}
+      <UpgradeModal />
+
       {/* 헤더 */}
       <header className="sticky top-0 z-10 bg-[var(--color-surface)] border-b border-[var(--color-border-light)] shadow-sm">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -81,6 +85,7 @@ export default function LearnPage() {
           </button>
 
           <div className="flex items-center gap-2">
+            <CreditBalance />
             <button onClick={toggleMode} className="icon-btn">
               <Settings className="w-5 h-5" />
             </button>

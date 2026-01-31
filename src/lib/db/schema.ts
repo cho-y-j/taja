@@ -76,6 +76,101 @@ export const userProgress = pgTable('user_progress', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+// ===== 관리자 시스템 =====
+export const adminUsers = pgTable('admin_users', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').references(() => users.id).unique().notNull(),
+  role: text('role').notNull().default('admin'), // 'super_admin', 'admin'
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ===== AI 크레딧 시스템 =====
+
+// 사용자 크레딧 잔액
+export const userCredits = pgTable('user_credits', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').references(() => users.id).unique().notNull(),
+  balance: integer('balance').default(200).notNull(), // 무료 크레딧
+  totalUsed: integer('total_used').default(0),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// 크레딧 거래 내역
+export const creditTransactions = pgTable('credit_transactions', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').references(() => users.id).notNull(),
+  amount: integer('amount').notNull(), // 음수=사용, 양수=충전
+  type: text('type').notNull(), // 'usage', 'purchase', 'subscription', 'bonus'
+  apiEndpoint: text('api_endpoint'),
+  tokensUsed: integer('tokens_used'),
+  description: text('description'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// 구독 정보
+export const subscriptions = pgTable('subscriptions', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').references(() => users.id).unique().notNull(),
+  plan: text('plan').notNull().default('monthly'), // 'monthly'
+  status: text('status').notNull().default('active'), // 'active', 'cancelled', 'expired'
+  priceKrw: integer('price_krw').notNull().default(1000),
+  currentPeriodStart: timestamp('current_period_start').notNull(),
+  currentPeriodEnd: timestamp('current_period_end').notNull(),
+  tossBillingKey: text('toss_billing_key'),
+  cancelledAt: timestamp('cancelled_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// 결제 내역
+export const payments = pgTable('payments', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').references(() => users.id).notNull(),
+  type: text('type').notNull(), // 'subscription', 'credit_pack'
+  amountKrw: integer('amount_krw').notNull(),
+  creditsAdded: integer('credits_added'), // 크레딧팩 구매 시
+  status: text('status').notNull().default('pending'), // 'pending', 'completed', 'failed', 'refunded'
+  tossPaymentKey: text('toss_payment_key'),
+  tossOrderId: text('toss_order_id'),
+  createdAt: timestamp('created_at').defaultNow(),
+  completedAt: timestamp('completed_at'),
+});
+
+// ===== 상세 통계 =====
+
+// 키스트로크 에러 (개별 에러 기록)
+export const keystrokeErrors = pgTable('keystroke_errors', {
+  id: serial('id').primaryKey(),
+  sessionId: text('session_id').references(() => practiceSessions.id),
+  userId: text('user_id').references(() => users.id).notNull(),
+  targetKey: text('target_key').notNull(),
+  typedKey: text('typed_key').notNull(),
+  position: integer('position').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// 키별 통계 (집계용)
+export const keyStatistics = pgTable('key_statistics', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').references(() => users.id).notNull(),
+  key: text('key').notNull(),
+  totalAttempts: integer('total_attempts').default(0),
+  errorCount: integer('error_count').default(0),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// 일별 통계 스냅샷
+export const dailyStats = pgTable('daily_stats', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').references(() => users.id).notNull(),
+  date: text('date').notNull(), // 'YYYY-MM-DD'
+  sessionsCount: integer('sessions_count').default(0),
+  totalTime: integer('total_time').default(0), // seconds
+  totalCharacters: integer('total_characters').default(0),
+  errorCount: integer('error_count').default(0),
+  avgWpm: real('avg_wpm'),
+  avgAccuracy: real('avg_accuracy'),
+});
+
 // 타입 추출
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -86,3 +181,13 @@ export type NewDocument = typeof documents.$inferInsert;
 export type TypingContent = typeof typingContents.$inferSelect;
 export type UserStats = typeof userStats.$inferSelect;
 export type UserProgress = typeof userProgress.$inferSelect;
+
+// 신규 테이블 타입
+export type AdminUser = typeof adminUsers.$inferSelect;
+export type UserCredit = typeof userCredits.$inferSelect;
+export type CreditTransaction = typeof creditTransactions.$inferSelect;
+export type Subscription = typeof subscriptions.$inferSelect;
+export type Payment = typeof payments.$inferSelect;
+export type KeystrokeError = typeof keystrokeErrors.$inferSelect;
+export type KeyStatistic = typeof keyStatistics.$inferSelect;
+export type DailyStat = typeof dailyStats.$inferSelect;

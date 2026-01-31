@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDocumentStore } from '@/stores/document-store';
+import { CreditBalance, UpgradeModal } from '@/components/credits';
 import { DocumentListView } from '@/components/documents/document-list-view';
 import { DocumentCreateView } from '@/components/documents/document-create-view';
 import { DocumentDetailView } from '@/components/documents/document-detail-view';
@@ -14,6 +15,9 @@ export default function DocumentsPage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
+      {/* 업그레이드 모달 */}
+      <UpgradeModal />
+
       {/* 헤더 */}
       <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="container mx-auto px-4 py-4">
@@ -29,12 +33,13 @@ export default function DocumentsPage() {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             )}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-1">
               <FileText className="w-5 h-5 text-[var(--color-primary)]" />
               <h1 className="text-xl font-bold text-[var(--color-text)]">
                 문서 연습
               </h1>
             </div>
+            <CreditBalance />
           </div>
         </div>
       </header>

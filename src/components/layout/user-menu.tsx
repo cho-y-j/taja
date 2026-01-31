@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { User, LogOut, BarChart2, ChevronDown } from 'lucide-react';
+import { User, LogOut, BarChart2, ChevronDown, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 // Clerk 설정 여부 확인
@@ -155,6 +155,14 @@ export function UserMenu() {
               >
                 <BarChart2 className="w-4 h-4" />
                 학습 통계
+              </Link>
+              <Link
+                href="/pricing"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-3 px-4 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-background)] transition-colors"
+              >
+                <CreditCard className="w-4 h-4" />
+                요금제
               </Link>
             </div>
 

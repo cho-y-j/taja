@@ -11,7 +11,16 @@ import {
   Flame,
   TrendingUp,
   Calendar,
+  Keyboard,
+  AlertTriangle,
+  BarChart3,
 } from 'lucide-react';
+import {
+  KeyboardHeatmap,
+  WeakKeysList,
+  ProgressChart,
+  PracticeBreakdown,
+} from '@/components/stats';
 
 // Clerk 설정 여부 확인
 const CLERK_CONFIGURED = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
@@ -44,6 +53,21 @@ interface TypeStat {
   avgAccuracy: number;
 }
 
+interface KeyStat {
+  key: string;
+  errorCount: number;
+  totalAttempts: number;
+  errorRate: number;
+}
+
+interface DailyStat {
+  date: string;
+  sessionsCount: number;
+  totalTime: number;
+  avgWpm: number;
+  avgAccuracy: number;
+}
+
 export default function StatsPage() {
   const router = useRouter();
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -52,7 +76,11 @@ export default function StatsPage() {
   const [recentSessions, setRecentSessions] = useState<PracticeSession[]>([]);
   const [todaySessions, setTodaySessions] = useState<PracticeSession[]>([]);
   const [typeStats, setTypeStats] = useState<TypeStat[]>([]);
+  const [heatmapData, setHeatmapData] = useState<KeyStat[]>([]);
+  const [weakKeys, setWeakKeys] = useState<KeyStat[]>([]);
+  const [dailyStats, setDailyStats] = useState<DailyStat[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'keys' | 'progress'>('overview');
 
   // Clerk 상태 확인
   useEffect(() => {
@@ -89,6 +117,7 @@ export default function StatsPage() {
 
   useEffect(() => {
     if (isSignedIn && isLoaded) {
+      // 기본 통계 가져오기
       fetch('/api/user/stats')
         .then((res) => res.json())
         .then((data) => {
@@ -96,6 +125,23 @@ export default function StatsPage() {
           setRecentSessions(data.recentSessions || []);
           setTodaySessions(data.todaySessions || []);
           setTypeStats(data.typeStats || []);
+        })
+        .catch(console.error);
+
+      // 키보드 히트맵 데이터
+      fetch('/api/stats/key-heatmap')
+        .then((res) => res.json())
+        .then((data) => {
+          setHeatmapData(data.heatmap || []);
+          setWeakKeys(data.weakKeys || []);
+        })
+        .catch(console.error);
+
+      // 일별 통계
+      fetch('/api/stats/daily?days=30')
+        .then((res) => res.json())
+        .then((data) => {
+          setDailyStats(data.stats || []);
         })
         .catch(console.error)
         .finally(() => setLoading(false));
@@ -167,8 +213,48 @@ export default function StatsPage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-        {/* 오늘의 학습 */}
-        <section className="card p-6 bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-light)] text-white">
+        {/* 탭 네비게이션 */}
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${
+              activeTab === 'overview'
+                ? 'bg-[var(--color-primary)] text-white'
+                : 'bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-background)]'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 inline mr-1.5" />
+            전체 현황
+          </button>
+          <button
+            onClick={() => setActiveTab('keys')}
+            className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${
+              activeTab === 'keys'
+                ? 'bg-[var(--color-primary)] text-white'
+                : 'bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-background)]'
+            }`}
+          >
+            <Keyboard className="w-4 h-4 inline mr-1.5" />
+            취약 키 분석
+          </button>
+          <button
+            onClick={() => setActiveTab('progress')}
+            className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${
+              activeTab === 'progress'
+                ? 'bg-[var(--color-primary)] text-white'
+                : 'bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-background)]'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4 inline mr-1.5" />
+            성장 추이
+          </button>
+        </div>
+
+        {/* ===== 전체 현황 탭 ===== */}
+        {activeTab === 'overview' && (
+          <>
+            {/* 오늘의 학습 */}
+            <section className="card p-6 bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-light)] text-white">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="w-5 h-5" />
             <h3 className="font-bold">오늘의 학습</h3>
@@ -312,19 +398,79 @@ export default function StatsPage() {
         )}
 
         {/* 데이터 없음 */}
-        {!stats && recentSessions.length === 0 && (
-          <div className="card p-12 text-center">
-            <Target className="w-16 h-16 mx-auto mb-4 text-[var(--color-text-light)]" />
-            <h3 className="text-lg font-bold text-[var(--color-text)] mb-2">
-              아직 학습 기록이 없어요
-            </h3>
-            <p className="text-[var(--color-text-muted)] mb-4">
-              연습을 시작하면 여기에 통계가 표시됩니다
-            </p>
-            <Link href="/learn">
-              <button className="btn btn-primary">학습 시작하기</button>
-            </Link>
-          </div>
+            {!stats && recentSessions.length === 0 && (
+              <div className="card p-12 text-center">
+                <Target className="w-16 h-16 mx-auto mb-4 text-[var(--color-text-light)]" />
+                <h3 className="text-lg font-bold text-[var(--color-text)] mb-2">
+                  아직 학습 기록이 없어요
+                </h3>
+                <p className="text-[var(--color-text-muted)] mb-4">
+                  연습을 시작하면 여기에 통계가 표시됩니다
+                </p>
+                <Link href="/learn">
+                  <button className="btn btn-primary">학습 시작하기</button>
+                </Link>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ===== 취약 키 분석 탭 ===== */}
+        {activeTab === 'keys' && (
+          <>
+            {/* 키보드 히트맵 */}
+            <section className="card p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Keyboard className="w-5 h-5 text-[var(--color-primary)]" />
+                <h3 className="font-bold text-[var(--color-text)]">키보드 히트맵</h3>
+              </div>
+              <p className="text-sm text-[var(--color-text-muted)] mb-6">
+                에러율에 따라 키가 색칠됩니다. 빨간색일수록 자주 틀리는 키입니다.
+              </p>
+              <KeyboardHeatmap data={heatmapData} layout="qwerty" />
+            </section>
+
+            {/* 취약 키 목록 */}
+            <section className="card p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <AlertTriangle className="w-5 h-5 text-[var(--color-warning)]" />
+                <h3 className="font-bold text-[var(--color-text)]">취약 키 TOP 5</h3>
+              </div>
+              <WeakKeysList keys={weakKeys} />
+            </section>
+          </>
+        )}
+
+        {/* ===== 성장 추이 탭 ===== */}
+        {activeTab === 'progress' && (
+          <>
+            {/* WPM 추이 */}
+            <section className="card p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Zap className="w-5 h-5 text-[var(--color-primary)]" />
+                <h3 className="font-bold text-[var(--color-text)]">WPM 추이</h3>
+              </div>
+              <ProgressChart data={dailyStats} metric="wpm" />
+            </section>
+
+            {/* 정확도 추이 */}
+            <section className="card p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Target className="w-5 h-5 text-[var(--color-success)]" />
+                <h3 className="font-bold text-[var(--color-text)]">정확도 추이</h3>
+              </div>
+              <ProgressChart data={dailyStats} metric="accuracy" />
+            </section>
+
+            {/* 연습 유형별 분포 */}
+            <section className="card p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <BarChart3 className="w-5 h-5 text-[var(--color-secondary)]" />
+                <h3 className="font-bold text-[var(--color-text)]">연습 유형별 분포</h3>
+              </div>
+              <PracticeBreakdown data={typeStats} />
+            </section>
+          </>
         )}
       </main>
     </div>

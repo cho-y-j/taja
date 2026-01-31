@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import type { TypingMetrics, PracticeType } from '@/types/typing';
 
+// 키스트로크 에러 상세 정보
+export interface KeystrokeError {
+  targetKey: string;
+  typedKey: string;
+  position: number;
+  timestamp: number;
+}
+
 interface TypingSessionState {
   // 현재 세션 정보
   practiceType: PracticeType | null;
@@ -8,6 +16,7 @@ interface TypingSessionState {
   currentIndex: number;
   userInput: string;
   errors: number[];
+  keystrokeErrors: KeystrokeError[]; // 상세 에러 정보
   startTime: number | null;
   endTime: number | null;
   isComplete: boolean;
@@ -27,6 +36,7 @@ interface TypingSessionState {
   resume: () => void;
   reset: () => void;
   complete: () => void;
+  getKeystrokeErrors: () => KeystrokeError[];
 }
 
 const initialMetrics: TypingMetrics = {
@@ -45,6 +55,7 @@ export const useTypingStore = create<TypingSessionState>((set, get) => ({
   currentIndex: 0,
   userInput: '',
   errors: [],
+  keystrokeErrors: [],
   startTime: null,
   endTime: null,
   isComplete: false,
@@ -59,6 +70,7 @@ export const useTypingStore = create<TypingSessionState>((set, get) => ({
       currentIndex: 0,
       userInput: '',
       errors: [],
+      keystrokeErrors: [],
       startTime: null,
       endTime: null,
       isComplete: false,
@@ -82,6 +94,17 @@ export const useTypingStore = create<TypingSessionState>((set, get) => ({
     const expectedChar = state.targetText[state.currentIndex];
     const isCorrect = char === expectedChar;
     const newErrors = isCorrect ? state.errors : [...state.errors, state.currentIndex];
+
+    // 키스트로크 에러 상세 기록
+    const newKeystrokeErrors = isCorrect
+      ? state.keystrokeErrors
+      : [...state.keystrokeErrors, {
+          targetKey: expectedChar,
+          typedKey: char,
+          position: state.currentIndex,
+          timestamp: Date.now(),
+        }];
+
     const newIndex = state.currentIndex + 1;
     const isComplete = newIndex >= state.targetText.length;
 
@@ -100,6 +123,7 @@ export const useTypingStore = create<TypingSessionState>((set, get) => ({
       currentIndex: newIndex,
       userInput: state.userInput + char,
       errors: newErrors,
+      keystrokeErrors: newKeystrokeErrors,
       endTime: isComplete ? Date.now() : null,
       isComplete,
       metrics: {
@@ -181,6 +205,7 @@ export const useTypingStore = create<TypingSessionState>((set, get) => ({
       currentIndex: 0,
       userInput: '',
       errors: [],
+      keystrokeErrors: [],
       startTime: null,
       endTime: null,
       isComplete: false,
@@ -195,5 +220,9 @@ export const useTypingStore = create<TypingSessionState>((set, get) => ({
       isComplete: true,
       endTime: Date.now(),
     });
+  },
+
+  getKeystrokeErrors: () => {
+    return get().keystrokeErrors;
   },
 }));

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import { YoutubeTranscript } from 'youtube-transcript';
+import { auth } from '@clerk/nextjs/server';
+import { db, users } from '@/lib/db';
+import { eq } from 'drizzle-orm';
+import { checkAndDeductCredits, estimateTokens } from '@/lib/credits';
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
@@ -226,6 +230,39 @@ export async function POST(request: NextRequest) {
 
     if (!DEEPSEEK_API_KEY) {
       return NextResponse.json({ error: 'API 키가 설정되지 않았습니다' }, { status: 500 });
+    }
+
+    // 로그인된 사용자인 경우 크레딧 체크
+    const { userId: clerkId } = await auth();
+
+    if (clerkId) {
+      const user = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkId, clerkId))
+        .limit(1);
+
+      if (user.length > 0) {
+        // URL이나 직접 콘텐츠 기반으로 토큰 추정
+        const estimateText = directContent || url || '';
+        const tokens = estimateTokens(estimateText);
+        const creditCheck = await checkAndDeductCredits(
+          user[0].id,
+          tokens,
+          '/api/ai/extract-content'
+        );
+
+        if (!creditCheck.allowed) {
+          return NextResponse.json(
+            {
+              error: 'CREDITS_DEPLETED',
+              message: '크레딧이 부족합니다. 충전하거나 구독해주세요.',
+              balance: creditCheck.balance,
+            },
+            { status: 402 }
+          );
+        }
+      }
     }
 
     let content: string;
