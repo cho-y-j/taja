@@ -23,9 +23,32 @@ interface Props {
   document: UserDocument;
 }
 
+// 구조화된 단어 데이터
+interface StructuredWord {
+  word: string;
+  meaning: string;
+  example: string;
+}
+
 export function WordPracticeMode({ document: doc }: Props) {
   const { addTranslation, getTranslation } = useDocumentStore();
-  const allWords = useMemo(() => extractWords(doc.content), [doc.content]);
+
+  // 구조화된 데이터가 있으면 사용, 없으면 기존 방식
+  const hasStructuredWords = doc.structured?.words && doc.structured.words.length > 0;
+  const structuredWords: StructuredWord[] = doc.structured?.words || [];
+  const allWords = useMemo(() => {
+    if (hasStructuredWords) {
+      return structuredWords.map(w => w.word);
+    }
+    return extractWords(doc.content);
+  }, [doc.content, hasStructuredWords, structuredWords]);
+
+  // 구조화된 단어에서 뜻 찾기
+  const getStructuredMeaning = useCallback((word: string): string | null => {
+    if (!hasStructuredWords) return null;
+    const found = structuredWords.find(w => w.word === word);
+    return found?.meaning || null;
+  }, [hasStructuredWords, structuredWords]);
 
   const [viewMode, setViewMode] = useState<ViewMode>('time');
   const [practiceTime, setPracticeTime] = useState(0);
@@ -166,17 +189,25 @@ export function WordPracticeMode({ document: doc }: Props) {
     };
   }, [viewMode, isStarted, isPaused, finishSession]);
 
-  // Fetch translation for word (with cache)
+  // Fetch translation for word (구조화된 데이터 우선 사용)
   const fetchTranslation = useCallback(async (word: string) => {
     if (!word) return;
 
-    // 캐시 확인
+    // 1. 구조화된 데이터에서 먼저 확인
+    const structuredMeaning = getStructuredMeaning(word);
+    if (structuredMeaning) {
+      setTranslation(structuredMeaning);
+      return;
+    }
+
+    // 2. 캐시 확인
     const cached = getTranslation(doc.id, word);
     if (cached) {
       setTranslation(cached);
       return;
     }
 
+    // 3. API 호출
     setTranslation('번역 중...');
     try {
       const response = await fetch('/api/ai/translate', {
@@ -191,7 +222,6 @@ export function WordPracticeMode({ document: doc }: Props) {
       const data = await response.json();
       if (data.translation) {
         setTranslation(data.translation);
-        // 캐시에 저장
         addTranslation(doc.id, word, data.translation);
       } else {
         setTranslation('번역 실패');
@@ -199,7 +229,7 @@ export function WordPracticeMode({ document: doc }: Props) {
     } catch {
       setTranslation('번역 오류');
     }
-  }, [doc.id, doc.language, getTranslation, addTranslation]);
+  }, [doc.id, doc.language, getTranslation, addTranslation, getStructuredMeaning]);
 
   // Move to next word
   const moveToNextWord = useCallback(() => {

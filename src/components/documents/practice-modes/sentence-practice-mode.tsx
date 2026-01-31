@@ -23,9 +23,31 @@ interface Props {
   document: UserDocument;
 }
 
+// 구조화된 문장 데이터
+interface StructuredSentence {
+  original: string;
+  translation: string;
+}
+
 export function SentencePracticeMode({ document: doc }: Props) {
   const { addTranslation, getTranslation } = useDocumentStore();
-  const allSentences = useMemo(() => extractSentences(doc.content), [doc.content]);
+
+  // 구조화된 데이터가 있으면 사용, 없으면 기존 방식
+  const hasStructuredSentences = doc.structured?.sentences && doc.structured.sentences.length > 0;
+  const structuredSentences: StructuredSentence[] = doc.structured?.sentences || [];
+  const allSentences = useMemo(() => {
+    if (hasStructuredSentences) {
+      return structuredSentences.map(s => s.original);
+    }
+    return extractSentences(doc.content);
+  }, [doc.content, hasStructuredSentences, structuredSentences]);
+
+  // 구조화된 문장에서 번역 찾기
+  const getStructuredTranslation = useCallback((sentence: string): string | null => {
+    if (!hasStructuredSentences) return null;
+    const found = structuredSentences.find(s => s.original === sentence);
+    return found?.translation || null;
+  }, [hasStructuredSentences, structuredSentences]);
 
   const [viewMode, setViewMode] = useState<ViewMode>('time');
   const [practiceTime, setPracticeTime] = useState(0);
@@ -171,13 +193,21 @@ export function SentencePracticeMode({ document: doc }: Props) {
   const fetchTranslation = useCallback(async (text: string) => {
     if (!text) return;
 
-    // 캐시 확인
+    // 1. 구조화된 데이터에서 먼저 확인
+    const structuredTrans = getStructuredTranslation(text);
+    if (structuredTrans) {
+      setTranslation(structuredTrans);
+      return;
+    }
+
+    // 2. 캐시 확인
     const cached = getTranslation(doc.id, text);
     if (cached) {
       setTranslation(cached);
       return;
     }
 
+    // 3. API 호출
     setTranslation('번역 중...');
     try {
       const response = await fetch('/api/ai/translate', {
@@ -192,7 +222,6 @@ export function SentencePracticeMode({ document: doc }: Props) {
       const data = await response.json();
       if (data.translation) {
         setTranslation(data.translation);
-        // 캐시에 저장
         addTranslation(doc.id, text, data.translation);
       } else {
         setTranslation('번역 실패');
@@ -200,7 +229,7 @@ export function SentencePracticeMode({ document: doc }: Props) {
     } catch {
       setTranslation('번역 오류');
     }
-  }, [doc.id, doc.language, getTranslation, addTranslation]);
+  }, [doc.id, doc.language, getTranslation, addTranslation, getStructuredTranslation]);
 
   // Move to next sentence
   const moveToNextSentence = useCallback(() => {
