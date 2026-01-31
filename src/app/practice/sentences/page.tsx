@@ -5,19 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
-  RotateCcw,
   Play,
   Pause,
   Clock,
   Target,
-  Zap,
   Trophy,
-  Home,
   ChevronRight,
-  Volume2,
-  VolumeX,
-  Eye,
-  EyeOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,7 +20,9 @@ import {
   getSentencesByCategory,
   type PracticeSentence,
 } from '@/lib/typing/sentence-practice';
-import { StarRating, getStarRating, getStarMessage } from '@/components/ui/star-rating';
+import { PracticeResult } from '@/components/practice';
+import { PracticeMetrics } from '@/components/practice';
+import { PracticeControls } from '@/components/practice';
 
 type ViewMode = 'category' | 'time' | 'practice' | 'result';
 
@@ -517,44 +512,13 @@ export default function SentencePracticePage() {
 
         <main className="container mx-auto px-4 py-6 max-w-4xl">
           {/* 상단 통계 패널 */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
-            {/* 타이머 - 크고 눈에 띄게 */}
-            <div className={`col-span-2 rounded-xl p-4 text-center transition-all ${
-              isUrgent
-                ? 'bg-red-100 border-2 border-red-400 animate-pulse'
-                : 'bg-[var(--color-surface)] border border-[var(--color-border)]'
-            }`}>
-              <div className="flex items-center justify-center gap-2">
-                <Clock className={`w-6 h-6 ${isUrgent ? 'text-red-600' : 'text-[var(--color-primary)]'}`} />
-                <span className={`text-4xl font-mono font-bold ${isUrgent ? 'text-red-600' : ''}`}>
-                  {formatTime(timeRemaining)}
-                </span>
-              </div>
-              <p className="text-xs text-[var(--color-text-muted)] mt-1">남은 시간</p>
-            </div>
-
-            {/* 현재 타수 */}
-            <div className="rounded-xl p-4 text-center bg-[var(--color-surface)] border border-[var(--color-border)]">
-              <div className="flex items-center justify-center gap-1">
-                <Zap className="w-5 h-5 text-[var(--color-secondary)]" />
-                <span className="text-3xl font-bold text-[var(--color-secondary)]">
-                  {currentWpm}
-                </span>
-              </div>
-              <p className="text-xs text-[var(--color-text-muted)]">WPM</p>
-            </div>
-
-            {/* 정확도 */}
-            <div className="rounded-xl p-4 text-center bg-[var(--color-surface)] border border-[var(--color-border)]">
-              <div className="flex items-center justify-center gap-1">
-                <Target className="w-5 h-5 text-[var(--color-success)]" />
-                <span className="text-3xl font-bold text-[var(--color-success)]">
-                  {getCurrentAccuracy()}%
-                </span>
-              </div>
-              <p className="text-xs text-[var(--color-text-muted)]">정확도</p>
-            </div>
-          </div>
+          <PracticeMetrics
+            wpm={currentWpm}
+            accuracy={getCurrentAccuracy()}
+            timeRemaining={timeRemaining}
+            variant="grid"
+            className="mb-6"
+          />
 
           {/* 완료 문장 수 */}
           <div className="text-center mb-4">
@@ -630,30 +594,15 @@ export default function SentencePracticePage() {
           </Card>
 
           {/* 컨트롤 버튼 */}
-          <div className="flex justify-center gap-3 flex-wrap">
-            <Button variant="outline" size="sm" onClick={togglePause}>
-              {isPaused ? <Play className="w-4 h-4 mr-1" /> : <Pause className="w-4 h-4 mr-1" />}
-              {isPaused ? '계속' : '일시정지'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => { setAutoListen(!autoListen); if (!autoListen && currentText) speakSentence(currentText); }}
-              className={autoListen ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600' : ''}
-            >
-              {autoListen ? <VolumeX className="w-4 h-4 mr-1" /> : <Volume2 className="w-4 h-4 mr-1" />}
-              {autoListen ? '음성 끄기' : '음성 듣기'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowTranslation(!showTranslation)}
-              className={showTranslation ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600' : ''}
-            >
-              {showTranslation ? <EyeOff className="w-4 h-4 mr-1" /> : <Eye className="w-4 h-4 mr-1" />}
-              {showTranslation ? '해석 숨기기' : '해석 보기'}
-            </Button>
-          </div>
+          <PracticeControls
+            isPaused={isPaused}
+            onTogglePause={togglePause}
+            onRestart={handleRestart}
+            ttsEnabled={autoListen}
+            onToggleTTS={() => { setAutoListen(!autoListen); if (!autoListen && currentText) speakSentence(currentText); }}
+            translationVisible={showTranslation}
+            onToggleTranslation={() => setShowTranslation(!showTranslation)}
+          />
         </main>
       </div>
     );
@@ -662,69 +611,20 @@ export default function SentencePracticePage() {
   // 결과 화면
   if (viewMode === 'result') {
     const { accuracy, wpm } = getResults();
-    const stars = getStarRating(accuracy);
-    const message = getStarMessage(stars);
 
     return (
-      <div className="min-h-screen bg-[var(--color-background)] flex items-center justify-center">
-        <div className="container mx-auto px-4 max-w-lg">
-          <Card className="celebration animate-scale-in">
-            <CardContent className="py-8 text-center">
-              {/* 타이틀 */}
-              <h2 className="text-2xl font-bold mb-4">{message}</h2>
-
-              {/* 별 */}
-              <div className="mb-6">
-                <StarRating rating={stars} size="lg" animated />
-              </div>
-
-              {/* 통계 */}
-              <div className="grid grid-cols-3 gap-4 mb-8">
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-1 text-[var(--color-primary)]">
-                    <Zap className="w-5 h-5" />
-                  </div>
-                  <p className="text-3xl font-bold">{wpm}</p>
-                  <p className="text-xs text-[var(--color-text-muted)]">WPM</p>
-                </div>
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-1 text-[var(--color-success)]">
-                    <Target className="w-5 h-5" />
-                  </div>
-                  <p className="text-3xl font-bold">{accuracy}%</p>
-                  <p className="text-xs text-[var(--color-text-muted)]">정확도</p>
-                </div>
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-1 text-[var(--color-secondary)]">
-                    <Trophy className="w-5 h-5" />
-                  </div>
-                  <p className="text-3xl font-bold">{sessionStats.totalSentences}</p>
-                  <p className="text-xs text-[var(--color-text-muted)]">문장</p>
-                </div>
-              </div>
-
-              {/* 상세 정보 */}
-              <div className="text-sm text-[var(--color-text-muted)] mb-6">
-                <p>총 {sessionStats.totalCharacters}자 입력</p>
-                <p>연습 시간: {formatTime(practiceTime)}</p>
-              </div>
-
-              {/* 버튼들 */}
-              <div className="flex justify-center gap-3">
-                <Button variant="outline" onClick={handleRestart}>
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  다시 연습
-                </Button>
-                <Link href="/learn/basic">
-                  <Button variant="primary">
-                    <Home className="w-4 h-4 mr-2" />
-                    학습 목록
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="min-h-screen bg-[var(--color-background)] flex items-center justify-center p-4">
+        <PracticeResult
+          wpm={wpm}
+          accuracy={accuracy}
+          totalTime={practiceTime}
+          correctCount={sessionStats.totalSentences}
+          totalCount={sessionStats.totalCharacters}
+          countLabel="문장"
+          onRestart={handleRestart}
+          onBack={() => router.push('/learn/basic')}
+          showStars
+        />
       </div>
     );
   }
