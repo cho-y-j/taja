@@ -15,11 +15,15 @@ import {
 } from 'lucide-react';
 import { useThemeStore } from '@/stores/theme-store';
 import { useDocumentStore } from '@/stores/document-store';
+import { useDocumentSync } from '@/hooks/use-document-sync';
 
 export default function AILearningPage() {
   const router = useRouter();
   const { language } = useThemeStore();
   const { documents, setViewMode, startCreate } = useDocumentStore();
+
+  // 로그인 시 문서 동기화
+  useDocumentSync();
 
   // 언어가 선택되지 않았다면 홈으로 리다이렉트
   useEffect(() => {

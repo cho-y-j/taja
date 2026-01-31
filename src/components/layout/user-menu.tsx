@@ -94,16 +94,16 @@ export function UserMenu() {
   }
 
   const handleSignOut = async () => {
-    if (signOutFn) {
-      signOutFn();
-    } else {
-      try {
-        const { useClerk } = await import('@clerk/nextjs');
-        // 리다이렉트로 로그아웃
-        window.location.href = '/';
-      } catch {
-        window.location.href = '/';
+    try {
+      // Clerk 전역 객체에서 signOut 호출
+      const clerkInstance = (window as unknown as { Clerk?: { signOut: () => Promise<void> } }).Clerk;
+      if (clerkInstance?.signOut) {
+        await clerkInstance.signOut();
       }
+      // 로그아웃 후 홈으로 이동
+      window.location.href = '/';
+    } catch {
+      window.location.href = '/';
     }
   };
 
