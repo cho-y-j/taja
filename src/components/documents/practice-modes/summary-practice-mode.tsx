@@ -312,6 +312,9 @@ export function SummaryPracticeMode({ document: doc }: Props) {
     return Math.round((sessionStats.correctCharacters / sessionStats.totalCharacters) * 100);
   };
 
+  // Custom time state
+  const [customMinutes, setCustomMinutes] = useState('');
+
   // Time selection screen
   if (viewMode === 'time') {
     const timeOptions = [
@@ -320,17 +323,24 @@ export function SummaryPracticeMode({ document: doc }: Props) {
       { seconds: 300, label: '5분' },
     ];
 
+    const handleCustomTime = () => {
+      const mins = parseInt(customMinutes, 10);
+      if (mins > 0 && mins <= 60) {
+        handleTimeSelect(mins * 60);
+      }
+    };
+
     return (
       <div className="text-center py-8">
         <h3 className="text-xl font-bold mb-2">연습 시간을 선택하세요</h3>
         <p className="text-[var(--color-text-muted)] mb-6">
           AI가 생성한 요약을 타이핑 | 시간이 끝나면 결과를 보여드려요
         </p>
-        <div className="flex justify-center gap-4">
+        <div className="flex justify-center gap-4 flex-wrap">
           {timeOptions.map(({ seconds, label }) => (
             <Card
               key={seconds}
-              className="cursor-pointer hover:shadow-lg transition-all hover:scale-105 w-32"
+              className="cursor-pointer hover:shadow-lg transition-all hover:scale-105 w-28"
               onClick={() => handleTimeSelect(seconds)}
             >
               <CardContent className="py-6 text-center">
@@ -340,6 +350,30 @@ export function SummaryPracticeMode({ document: doc }: Props) {
             </Card>
           ))}
         </div>
+        {/* 수동 입력 */}
+        <div className="mt-6 flex items-center justify-center gap-2">
+          <input
+            type="number"
+            min="1"
+            max="60"
+            value={customMinutes}
+            onChange={(e) => setCustomMinutes(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleCustomTime()}
+            placeholder="분"
+            className="w-20 px-3 py-2 text-center border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)]"
+          />
+          <span className="text-[var(--color-text-muted)]">분</span>
+          <Button
+            onClick={handleCustomTime}
+            disabled={!customMinutes || parseInt(customMinutes, 10) <= 0}
+            size="sm"
+          >
+            시작
+          </Button>
+        </div>
+        <p className="text-xs text-[var(--color-text-muted)] mt-2">
+          1~60분 사이 직접 입력
+        </p>
       </div>
     );
   }

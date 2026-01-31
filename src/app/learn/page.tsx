@@ -20,7 +20,7 @@ const CLERK_CONFIGURED = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
 
 export default function LearnPage() {
   const router = useRouter();
-  const { language, setLanguage, toggleMode } = useThemeStore();
+  const { language, clearLanguage, toggleMode } = useThemeStore();
   const [isSignedIn, setIsSignedIn] = useState(false);
 
   // Clerk가 설정된 경우에만 로그인 상태 확인
@@ -51,7 +51,7 @@ export default function LearnPage() {
   }, [language, router]);
 
   const handleChangeLanguage = () => {
-    setLanguage(null as unknown as 'en' | 'ko');
+    clearLanguage();
     router.push('/');
   };
 

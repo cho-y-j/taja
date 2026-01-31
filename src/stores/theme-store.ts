@@ -7,7 +7,8 @@ interface ThemeState {
   language: Language | null;
   setMode: (mode: ThemeMode) => void;
   toggleMode: () => void;
-  setLanguage: (language: Language) => void;
+  setLanguage: (language: Language | null) => void;
+  clearLanguage: () => void;
   hasSelectedLanguage: () => boolean;
 }
 
@@ -22,6 +23,7 @@ export const useThemeStore = create<ThemeState>()(
           mode: state.mode === 'junior' ? 'senior' : 'junior',
         })),
       setLanguage: (language) => set({ language }),
+      clearLanguage: () => set({ language: null }),
       hasSelectedLanguage: () => get().language !== null,
     }),
     {
