@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { RotateCcw, Clock, Target, Zap, Trophy, Play, Pause, Volume2, VolumeX, Eye, EyeOff } from 'lucide-react';
+import { Clock, Target, Zap, Trophy, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { extractSentences } from '@/lib/documents/document-utils';
 import { getPreferredVoice } from '@/lib/speech/tts-utils';
-import { StarRating, getStarRating, getStarMessage } from '@/components/ui/star-rating';
 import { playErrorSound, playKeySound } from '@/lib/utils/sound';
 import { useDocumentStore, type UserDocument } from '@/stores/document-store';
+import { TimeSelector, PracticeControls, PracticeResult } from '@/components/practice';
 
 type ViewMode = 'time' | 'practice' | 'result';
 
@@ -361,69 +361,16 @@ export function SentencePracticeMode({ document: doc }: Props) {
     return Math.round((sessionStats.correctCharacters / sessionStats.totalCharacters) * 100);
   };
 
-  // Custom time state
-  const [customMinutes, setCustomMinutes] = useState('');
-
   // Time selection screen
   if (viewMode === 'time') {
-    const timeOptions = [
-      { seconds: 60, label: '1분' },
-      { seconds: 180, label: '3분' },
-      { seconds: 300, label: '5분' },
-    ];
-
-    const handleCustomTime = () => {
-      const mins = parseInt(customMinutes, 10);
-      if (mins > 0 && mins <= 60) {
-        handleTimeSelect(mins * 60);
-      }
-    };
-
     return (
-      <div className="text-center py-8">
-        <h3 className="text-xl font-bold mb-2">연습 시간을 선택하세요</h3>
-        <p className="text-[var(--color-text-muted)] mb-6">
-          문장 {allSentences.length}개 | 시간이 끝나면 결과를 보여드려요
-        </p>
-        <div className="flex justify-center gap-4 flex-wrap">
-          {timeOptions.map(({ seconds, label }) => (
-            <Card
-              key={seconds}
-              className="cursor-pointer hover:shadow-lg transition-all hover:scale-105 w-28"
-              onClick={() => handleTimeSelect(seconds)}
-            >
-              <CardContent className="py-6 text-center">
-                <Clock className="w-8 h-8 mx-auto mb-2 text-[var(--color-primary)]" />
-                <p className="text-xl font-bold">{label}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        {/* 수동 입력 */}
-        <div className="mt-6 flex items-center justify-center gap-2">
-          <input
-            type="number"
-            min="1"
-            max="60"
-            value={customMinutes}
-            onChange={(e) => setCustomMinutes(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleCustomTime()}
-            placeholder="분"
-            className="w-20 px-3 py-2 text-center border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)]"
-          />
-          <span className="text-[var(--color-text-muted)]">분</span>
-          <Button
-            onClick={handleCustomTime}
-            disabled={!customMinutes || parseInt(customMinutes, 10) <= 0}
-            size="sm"
-          >
-            시작
-          </Button>
-        </div>
-        <p className="text-xs text-[var(--color-text-muted)] mt-2">
-          1~60분 사이 직접 입력
-        </p>
-      </div>
+      <TimeSelector
+        presets={[60, 180, 300]}
+        onSelect={handleTimeSelect}
+        itemCount={allSentences.length}
+        itemLabel="문장"
+        customEnabled
+      />
     );
   }
 
@@ -540,39 +487,24 @@ export function SentencePracticeMode({ document: doc }: Props) {
         </Card>
 
         {/* Controls */}
-        <div className="flex justify-center gap-3 flex-wrap">
-          <Button variant="outline" size="sm" onClick={togglePause}>
-            {isPaused ? <Play className="w-4 h-4 mr-1" /> : <Pause className="w-4 h-4 mr-1" />}
-            {isPaused ? '계속' : '일시정지'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => { setAutoListen(!autoListen); if (!autoListen) speakSentence(currentSentence); }}
-            className={autoListen ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600' : ''}
-          >
-            {autoListen ? <VolumeX className="w-4 h-4 mr-1" /> : <Volume2 className="w-4 h-4 mr-1" />}
-            {autoListen ? '음성 끄기' : '음성 듣기'}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setShowTranslation(!showTranslation);
-              if (!showTranslation && currentSentence) {
-                fetchTranslation(currentSentence);
-              }
-            }}
-            className={showTranslation ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600' : ''}
-          >
-            {showTranslation ? <EyeOff className="w-4 h-4 mr-1" /> : <Eye className="w-4 h-4 mr-1" />}
-            {showTranslation ? '해석 숨기기' : '해석 보기'}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleRestart}>
-            <RotateCcw className="w-4 h-4 mr-1" />
-            다시 시작
-          </Button>
-        </div>
+        <PracticeControls
+          isPaused={isPaused}
+          isComplete={false}
+          onTogglePause={togglePause}
+          onRestart={handleRestart}
+          ttsEnabled={autoListen}
+          onToggleTTS={() => {
+            setAutoListen(!autoListen);
+            if (!autoListen) speakSentence(currentSentence);
+          }}
+          translationVisible={showTranslation}
+          onToggleTranslation={() => {
+            setShowTranslation(!showTranslation);
+            if (!showTranslation && currentSentence) {
+              fetchTranslation(currentSentence);
+            }
+          }}
+        />
       </div>
     );
   }
@@ -580,50 +512,18 @@ export function SentencePracticeMode({ document: doc }: Props) {
   // Result screen
   if (viewMode === 'result') {
     const { accuracy, wpm } = getResults();
-    const stars = getStarRating(accuracy);
-    const message = getStarMessage(stars);
 
     return (
-      <div className="py-8">
-        <Card className="max-w-lg mx-auto">
-          <CardContent className="py-8 text-center">
-            <h2 className="text-2xl font-bold mb-4">{message}</h2>
-            <div className="mb-6">
-              <StarRating rating={stars} size="lg" animated />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4 mb-8">
-              <div className="text-center">
-                <Zap className="w-5 h-5 mx-auto text-[var(--color-primary)]" />
-                <p className="text-3xl font-bold">{wpm}</p>
-                <p className="text-xs text-[var(--color-text-muted)]">WPM</p>
-              </div>
-              <div className="text-center">
-                <Target className="w-5 h-5 mx-auto text-[var(--color-success)]" />
-                <p className="text-3xl font-bold">{accuracy}%</p>
-                <p className="text-xs text-[var(--color-text-muted)]">정확도</p>
-              </div>
-              <div className="text-center">
-                <Trophy className="w-5 h-5 mx-auto text-[var(--color-secondary)]" />
-                <p className="text-3xl font-bold">{sessionStats.totalSentences}</p>
-                <p className="text-xs text-[var(--color-text-muted)]">문장</p>
-              </div>
-            </div>
-
-            <div className="text-sm text-[var(--color-text-muted)] mb-6">
-              <p>총 {sessionStats.totalCharacters}자 입력</p>
-              <p>연습 시간: {formatTime(practiceTime)}</p>
-            </div>
-
-            <div className="flex justify-center gap-3">
-              <Button variant="outline" onClick={handleRestart}>
-                <RotateCcw className="w-4 h-4 mr-2" />
-                다시 연습
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <PracticeResult
+        wpm={wpm}
+        accuracy={accuracy}
+        totalTime={practiceTime}
+        correctCount={sessionStats.totalSentences}
+        totalCount={sessionStats.totalCharacters}
+        countLabel="문장"
+        onRestart={handleRestart}
+        showStars
+      />
     );
   }
 

@@ -3,7 +3,8 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, RotateCcw, Play, Home, X, Globe, Eye, EyeOff, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, Play, Home, X, Globe } from 'lucide-react';
+import { PracticeControls } from '@/components/practice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { MetricsDisplay } from '@/components/typing/metrics-display';
@@ -366,37 +367,18 @@ export default function WordPracticePage() {
         <MetricsDisplay metrics={metrics} className="mb-6" />
 
         {/* 컨트롤 버튼 */}
-        <div className="flex justify-center gap-4 mt-8 flex-wrap">
-          {!isComplete && isStarted && (
-            <Button variant="outline" onClick={isPaused ? resume : pause}>
-              {isPaused ? '계속' : '일시정지'}
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            onClick={() => { setAutoListen(!autoListen); if (!autoListen && currentWord) speakWord(currentWord); }}
-            className={autoListen ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600' : ''}
-          >
-            {autoListen ? <VolumeX className="w-4 h-4 mr-2" /> : <Volume2 className="w-4 h-4 mr-2" />}
-            {autoListen ? '음성 끄기' : '음성 듣기'}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setShowTranslation(!showTranslation)}
-            className={showTranslation ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600' : ''}
-          >
-            {showTranslation ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
-            {showTranslation ? '해석 숨기기' : '해석 보기'}
-          </Button>
-          <Button variant="outline" onClick={handleRestart}>
-            <RotateCcw className="w-4 h-4 mr-2" />
-            다시 연습
-          </Button>
-          <Button variant="outline" onClick={handleBackToSelect}>
-            <Home className="w-4 h-4 mr-2" />
-            레벨 선택
-          </Button>
-        </div>
+        <PracticeControls
+          isPaused={isPaused}
+          isComplete={isComplete}
+          onTogglePause={!isComplete && isStarted ? (isPaused ? resume : pause) : undefined}
+          onRestart={handleRestart}
+          onBack={handleBackToSelect}
+          ttsEnabled={autoListen}
+          onToggleTTS={() => { setAutoListen(!autoListen); if (!autoListen && currentWord) speakWord(currentWord); }}
+          translationVisible={showTranslation}
+          onToggleTranslation={() => setShowTranslation(!showTranslation)}
+          className="mt-8"
+        />
 
         {/* 완료 결과 */}
         {isComplete && (

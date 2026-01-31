@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
-  RotateCcw,
   Play,
   X,
   Globe,
@@ -15,6 +14,7 @@ import {
   EyeOff,
   ChevronRight,
 } from 'lucide-react';
+import { PracticeControls, PracticeResult } from '@/components/practice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { MetricsDisplay } from '@/components/typing/metrics-display';
@@ -520,34 +520,22 @@ export default function ListenWritePracticePage() {
         <MetricsDisplay metrics={metrics} className="mb-6" />
 
         {/* 컨트롤 버튼 */}
-        <div className="flex justify-center gap-4 mt-8">
-          {!isComplete && isStarted && (
-            <Button variant="outline" onClick={isPaused ? resume : pause}>
-              {isPaused ? '계속' : '일시정지'}
-            </Button>
-          )}
-          <Button variant="outline" onClick={handleRestart}>
-            <RotateCcw className="w-4 h-4 mr-2" />
-            다시 연습
-          </Button>
-          <Button variant="outline" onClick={handleBackToSelect}>
-            문장 선택
-          </Button>
-        </div>
+        <PracticeControls
+          isPaused={isPaused}
+          isComplete={isComplete}
+          onTogglePause={!isComplete && isStarted ? (isPaused ? resume : pause) : undefined}
+          onRestart={handleRestart}
+          onBack={handleBackToSelect}
+          backLabel="문장 선택"
+          className="mt-8"
+        />
 
         {/* 완료 결과 */}
         {isComplete && (
-          <Card className="mt-6 border-green-500 bg-green-50">
-            <CardContent className="py-6 text-center">
-              <h3 className="text-2xl font-bold text-green-700 mb-2">
-                완료!
-              </h3>
-              <p className="text-green-600 mb-2">
-                정확도 {metrics.accuracy}% | 속도 {metrics.wpm} WPM
-              </p>
-
-              {/* 정답 비교 */}
-              <div className="text-left bg-white rounded-lg p-4 mb-4 mt-4">
+          <div className="mt-6">
+            {/* 정답 비교 */}
+            <Card className="mb-4 border-[var(--color-border)]">
+              <CardContent className="py-4">
                 <p className="text-sm text-[var(--color-text-muted)] mb-1">정답:</p>
                 <p className="text-lg mb-3 font-medium">{currentSentence?.text}</p>
                 <p className="text-sm text-[var(--color-text-muted)] mb-1">입력한 내용:</p>
@@ -561,18 +549,22 @@ export default function ListenWritePracticePage() {
                     );
                   })}
                 </p>
-              </div>
+              </CardContent>
+            </Card>
 
-              <div className="flex justify-center gap-4">
-                <Button variant="outline" onClick={handleRestart}>
-                  다시 연습
-                </Button>
-                <Button onClick={handleNextSentence} className="bg-green-600 hover:bg-green-700">
-                  다음 문장
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            <PracticeResult
+              wpm={metrics.wpm}
+              accuracy={metrics.accuracy}
+              totalTime={Math.round(metrics.elapsedTime / 1000)}
+              correctCount={practiceText.length - errors.length}
+              totalCount={practiceText.length}
+              countLabel="글자"
+              onRestart={handleRestart}
+              onNext={handleNextSentence}
+              nextLabel="다음 문장"
+              showStars
+            />
+          </div>
         )}
       </main>
     </div>

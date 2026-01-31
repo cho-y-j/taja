@@ -11,6 +11,7 @@ interface PracticeControlsProps {
   onRestart: () => void;
   onExit?: () => void;
   onBack?: () => void;
+  backLabel?: string;
   // TTS controls
   ttsEnabled?: boolean;
   onToggleTTS?: () => void;
@@ -27,6 +28,7 @@ export function PracticeControls({
   onRestart,
   onExit,
   onBack,
+  backLabel = '선택 화면',
   ttsEnabled,
   onToggleTTS,
   translationVisible,
@@ -83,7 +85,7 @@ export function PracticeControls({
       {onBack && (
         <Button variant="outline" size="sm" onClick={onBack}>
           <Home className="w-4 h-4 mr-1" />
-          선택 화면
+          {backLabel}
         </Button>
       )}
 

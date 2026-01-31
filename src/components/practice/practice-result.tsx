@@ -16,6 +16,7 @@ interface PracticeResultProps {
   onRestart: () => void;
   onBack?: () => void;
   onNext?: () => void;
+  nextLabel?: string;
   showStars?: boolean;
   className?: string;
 }
@@ -30,6 +31,7 @@ export function PracticeResult({
   onRestart,
   onBack,
   onNext,
+  nextLabel = '다음',
   showStars = true,
   className,
 }: PracticeResultProps) {
@@ -101,7 +103,7 @@ export function PracticeResult({
             </Button>
             {onNext && (
               <Button onClick={onNext}>
-                다음
+                {nextLabel}
               </Button>
             )}
             {onBack && (
