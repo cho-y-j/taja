@@ -53,6 +53,40 @@ export async function GET(request: NextRequest) {
       .groupBy(sql`date(${users.createdAt})`)
       .orderBy(sql`date(${users.createdAt})`);
 
+    // 연습 유형별 분포
+    const practiceByType = await db
+      .select({
+        type: practiceSessions.type,
+        count: sql<number>`count(*)`,
+      })
+      .from(practiceSessions)
+      .where(gte(practiceSessions.completedAt, startDate))
+      .groupBy(practiceSessions.type)
+      .orderBy(desc(sql`count(*)`));
+
+    // 일별 평균 WPM/정확도
+    const dailyPerformance = await db
+      .select({
+        date: sql<string>`date(${practiceSessions.completedAt})`,
+        avgWpm: sql<number>`avg(${practiceSessions.wpm})`,
+        avgAccuracy: sql<number>`avg(${practiceSessions.accuracy})`,
+      })
+      .from(practiceSessions)
+      .where(gte(practiceSessions.completedAt, startDate))
+      .groupBy(sql`date(${practiceSessions.completedAt})`)
+      .orderBy(sql`date(${practiceSessions.completedAt})`);
+
+    // 일별 크레딧 사용량
+    const dailyCreditUsage = await db
+      .select({
+        date: sql<string>`date(${creditTransactions.createdAt})`,
+        total: sql<number>`sum(abs(${creditTransactions.amount}))`,
+      })
+      .from(creditTransactions)
+      .where(sql`${creditTransactions.type} = 'usage' AND ${creditTransactions.createdAt} >= ${startDate}`)
+      .groupBy(sql`date(${creditTransactions.createdAt})`)
+      .orderBy(sql`date(${creditTransactions.createdAt})`);
+
     return NextResponse.json({
       dailyActiveUsers: dailyActiveUsers.map((d) => ({
         date: d.date,
@@ -65,6 +99,19 @@ export async function GET(request: NextRequest) {
       signupsPerDay: signupsPerDay.map((s) => ({
         date: s.date,
         count: Number(s.count),
+      })),
+      practiceByType: practiceByType.map((p) => ({
+        type: p.type || 'unknown',
+        count: Number(p.count),
+      })),
+      dailyPerformance: dailyPerformance.map((d) => ({
+        date: d.date,
+        avgWpm: Math.round(Number(d.avgWpm) || 0),
+        avgAccuracy: Math.round(Number(d.avgAccuracy) || 0),
+      })),
+      dailyCreditUsage: dailyCreditUsage.map((c) => ({
+        date: c.date,
+        total: Number(c.total) || 0,
       })),
     });
   } catch (error) {
