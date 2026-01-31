@@ -1,4 +1,4 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { clerkMiddleware, createRouteMatcher, clerkClient } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
 // 공개 라우트 (로그인 없이 접근 가능)
@@ -32,7 +32,23 @@ export default clerkMiddleware(async (auth, req) => {
     }
 
     // 관리자 권한 체크 (Clerk Dashboard에서 publicMetadata.role = 'admin' 설정)
-    const role = (sessionClaims?.metadata as { role?: string })?.role;
+    // sessionClaims에서 먼저 확인
+    const metadata = sessionClaims?.metadata as Record<string, unknown> | undefined;
+    const publicMetadata = sessionClaims?.publicMetadata as Record<string, unknown> | undefined;
+    let role = metadata?.role || publicMetadata?.role ||
+      (sessionClaims as Record<string, unknown>)?.role;
+
+    // sessionClaims에 없으면 Clerk API로 직접 확인
+    if (!role) {
+      try {
+        const client = await clerkClient();
+        const user = await client.users.getUser(userId);
+        role = user.publicMetadata?.role as string | undefined;
+      } catch (error) {
+        console.error('Failed to fetch user metadata:', error);
+      }
+    }
+
     if (role !== 'admin' && role !== 'super_admin') {
       // 권한 없음 - 홈으로 리다이렉트
       return NextResponse.redirect(new URL('/learn', req.url));
