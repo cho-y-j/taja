@@ -4,10 +4,12 @@ import { PenLine, Upload, Bot, FileText, Trash2, ChevronRight, Link2 } from 'luc
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
 import { useDocumentStore, type CreateSource } from '@/stores/document-store';
+import { useThemeStore } from '@/stores/theme-store';
 
 export function DocumentListView() {
   const { documents, startCreate, selectDocument, deleteDocument } =
     useDocumentStore();
+  const { language: themeLanguage } = useThemeStore();
 
   const sources: { key: CreateSource; icon: typeof PenLine; label: string; desc: string }[] = [
     { key: 'manual', icon: PenLine, label: '직접 입력', desc: '문서를 직접 작성합니다' },
@@ -23,7 +25,7 @@ export function DocumentListView() {
         {sources.map((src) => (
           <button
             key={src.key}
-            onClick={() => startCreate(src.key)}
+            onClick={() => startCreate(src.key, themeLanguage || 'ko')}
             className="flex items-center gap-3 p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-primary)] hover:shadow-md transition-all text-left"
           >
             <div className="w-10 h-10 rounded-lg bg-[var(--color-primary)] flex items-center justify-center flex-shrink-0">

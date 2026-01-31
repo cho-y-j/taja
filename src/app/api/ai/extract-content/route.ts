@@ -80,28 +80,42 @@ async function generateVocabAndSentences(
 ): Promise<{ title: string; content: string; structured: { words: LearningDocument['words']; sentences: LearningDocument['sentences'] } }> {
 
   // 영어 콘텐츠에서 추출 (영어 단어/문장 + 한국어 번역)
-  const systemPromptEn = `You are a language learning content extractor.
-Extract words and sentences from the given text and create a structured learning document.
+  const systemPromptEn = `You are an English language learning content extractor for Korean speakers.
+Extract English words and sentences from the given text.
 
 ${customInstruction ? `User instruction: ${customInstruction}\n` : ''}
+
+CRITICAL RULES:
+- "word" field must contain ONLY the English word (e.g., "apple", "beautiful")
+- "word" field must NEVER contain Korean characters or translations mixed in
+- "meaning" field contains the Korean meaning/definition
+- "example" field must be an English sentence from the text using the word
+- "original" field in sentences must be ONLY in English
+- "translation" field contains the Korean translation
 
 IMPORTANT: Return ONLY valid JSON, no other text.
 
 JSON Format:
 {
-  "title": "Document title in Korean",
+  "title": "문서 제목 (한국어로)",
   "words": [
-    { "word": "English word from text", "meaning": "Korean meaning", "example": "Example sentence from text" }
+    { "word": "English word ONLY", "meaning": "한국어 뜻", "example": "English example from text" }
   ],
   "sentences": [
-    { "original": "English sentence from text", "translation": "Korean translation" }
+    { "original": "English sentence ONLY", "translation": "한국어 번역" }
   ]
 }
 
+Example of CORRECT word entry:
+{ "word": "innovation", "meaning": "혁신, 혁신적인 것", "example": "The innovation changed everything." }
+
+Example of WRONG word entry (DO NOT DO THIS):
+{ "word": "innovation (혁신)", "meaning": "혁신적인 것", "example": "..." }
+
 Rules:
-- Extract 10-15 important words with meanings and example sentences
-- Extract 8-12 useful sentences with translations
-- All meanings and translations must be in Korean
+- Extract 10-15 important English words with Korean meanings
+- Extract 8-12 useful English sentences with Korean translations
+- Words must be ONLY in English, meanings ONLY in Korean
 - Keep sentences concise (under 100 characters)
 - Return ONLY the JSON object`;
 

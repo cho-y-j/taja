@@ -36,29 +36,41 @@ export async function POST(request: NextRequest) {
     }
 
     // 영어 학습 문서 생성 (영어 단어/문장 + 한국어 번역)
-    const systemPromptEn = `You are a language learning content creator.
-Create a structured learning document with English words and sentences.
+    const systemPromptEn = `You are an English language learning content creator for Korean speakers.
+Create a structured learning document with ONLY English words and sentences.
+
+CRITICAL RULES:
+- "word" field must contain ONLY the English word (e.g., "apple", "beautiful", "accomplish")
+- "word" field must NEVER contain Korean characters or translations
+- "meaning" field contains the Korean meaning/definition
+- "example" field must be a complete English sentence using the word
+- "original" field in sentences must be ONLY in English
+- "translation" field contains the Korean translation
 
 IMPORTANT: Return ONLY valid JSON, no other text.
 
 JSON Format:
 {
-  "title": "Document title in Korean",
+  "title": "문서 제목 (한국어로)",
   "words": [
-    { "word": "English word", "meaning": "Korean meaning", "example": "English example sentence" }
+    { "word": "English word ONLY", "meaning": "한국어 뜻", "example": "English example sentence" }
   ],
   "sentences": [
-    { "original": "English sentence", "translation": "Korean translation" }
+    { "original": "English sentence ONLY", "translation": "한국어 번역" }
   ]
 }
 
+Example of CORRECT word entry:
+{ "word": "accomplish", "meaning": "성취하다, 달성하다", "example": "She accomplished her goal." }
+
+Example of WRONG word entry (DO NOT DO THIS):
+{ "word": "accomplish (성취하다)", "meaning": "달성하다", "example": "..." }
+
 Rules:
-- Create 10-15 words with meanings and example sentences
-- Create 8-12 practice sentences with translations
-- Words should be relevant to the topic
-- Sentences should be natural and useful
-- All meanings and translations must be in Korean
-- Return ONLY the JSON object, nothing else`;
+- Create 10-15 English words with Korean meanings and English example sentences
+- Create 8-12 English practice sentences with Korean translations
+- Words must be ONLY in English, meanings ONLY in Korean
+- Return ONLY the JSON object`;
 
     // 한국어 학습 문서 생성 (한국어 단어/문장 + 영어 번역)
     const systemPromptKo = `당신은 한국어 학습 콘텐츠 제작자입니다.

@@ -84,7 +84,7 @@ interface DocumentActions {
 
   setDraft: (name: string, content: string, language: 'en' | 'ko') => void;
   clearDraft: () => void;
-  startCreate: (source: CreateSource) => void;
+  startCreate: (source: CreateSource, language?: 'en' | 'ko') => void;
   startEdit: (docId: string) => void;
 
   setPracticeItems: (items: string[]) => void;
@@ -219,13 +219,13 @@ export const useDocumentStore = create<DocumentState & DocumentActions>()(
           createSource: null,
         }),
 
-      startCreate: (source) =>
+      startCreate: (source, language) =>
         set({
           viewMode: 'create',
           createSource: source,
           draftName: '',
           draftContent: '',
-          draftLanguage: 'ko',
+          draftLanguage: language || 'ko',
           editingDocumentId: null,
         }),
 
