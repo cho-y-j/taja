@@ -19,7 +19,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { MetricsDisplay } from '@/components/typing/metrics-display';
 import { useTypingEngine } from '@/hooks/use-typing-engine';
-import { useIMEInput } from '@/hooks/use-ime-input';
 import {
   getSampleSentences,
   getRandomSentence,
@@ -89,28 +88,57 @@ export default function ListenWritePracticePage() {
     startSession,
   } = useTypingEngine(practiceText, 'listen-write');
 
-  // IME 입력 처리 훅
-  const {
-    inputRef,
-    inputValue,
-    handleChange: handleInputChange,
-    handleCompositionStart,
-    handleCompositionEnd,
-    resetInput,
-    focus: focusInput,
-  } = useIMEInput({
-    onInput: processInput,
-    onBackspace: processBackspace,
-    onStart: startSession,
-    disabled: isPaused || isComplete,
-  });
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isComposingRef = useRef(false);
+  const [inputValue, setInputValue] = useState('');
 
   // userInput이 리셋되면 inputValue도 리셋
   useEffect(() => {
     if (userInput === '') {
-      resetInput();
+      setInputValue('');
     }
-  }, [userInput, resetInput]);
+  }, [userInput]);
+
+  // 한글 IME 조합 시작
+  const handleCompositionStart = useCallback(() => {
+    isComposingRef.current = true;
+  }, []);
+
+  // 한글 IME 조합 완료
+  const handleCompositionEnd = useCallback((e: React.CompositionEvent<HTMLInputElement>) => {
+    isComposingRef.current = false;
+    const value = e.currentTarget.value;
+    setInputValue(value);
+
+    const currentLen = userInput.length;
+    for (let i = currentLen; i < value.length; i++) {
+      processInput(value[i]);
+    }
+  }, [userInput, processInput]);
+
+  // 입력 변경 처리
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+
+    if (!isStarted && value.length > 0) {
+      startSession();
+    }
+
+    if (isComposingRef.current) return;
+
+    if (value.length < userInput.length) {
+      const diff = userInput.length - value.length;
+      for (let i = 0; i < diff; i++) {
+        processBackspace();
+      }
+      return;
+    }
+
+    for (let i = userInput.length; i < value.length; i++) {
+      processInput(value[i]);
+    }
+  }, [isStarted, userInput, processInput, processBackspace, startSession]);
 
   // 자연스러운 음성 선택
   const getPreferredVoice = useCallback((lang: Language) => {
@@ -196,8 +224,8 @@ export default function ListenWritePracticePage() {
     reset();
     setShowHint(difficultyInfo[difficulty].showHint);
     stopSpeaking();
-    focusInput();
-  }, [difficulty, reset, focusInput, stopSpeaking]);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, [difficulty, reset, stopSpeaking]);
 
   // 다음 문장
   const handleNextSentence = useCallback(() => {
@@ -236,13 +264,13 @@ export default function ListenWritePracticePage() {
 
   // 연습 화면 진입 시 자동으로 읽기
   useEffect(() => {
-    if (viewMode === 'practice' && currentSentence) {
+    if (viewMode === 'practice' && currentSentence && inputRef.current) {
       setTimeout(() => {
-        focusInput();
+        inputRef.current?.focus();
         speakSentence();
       }, 500);
     }
-  }, [viewMode, currentSentence, focusInput, speakSentence]);
+  }, [viewMode, currentSentence, speakSentence]);
 
   const sentences = getSampleSentences(language).filter(s => s.difficulty === difficulty);
 
