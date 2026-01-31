@@ -4,6 +4,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 import { koKR } from '@clerk/localizations';
 import './globals.css';
 import { ThemeProvider } from '@/components/providers/theme-provider';
+import { UserSyncProvider } from '@/components/providers/user-sync-provider';
 
 const notoSansKR = Noto_Sans_KR({
   subsets: ['latin'],
@@ -27,7 +28,9 @@ export default function RootLayout({
       <html lang="ko" suppressHydrationWarning>
         <body className={`${notoSansKR.variable} antialiased`}>
           <ThemeProvider>
-            {children}
+            <UserSyncProvider>
+              {children}
+            </UserSyncProvider>
           </ThemeProvider>
         </body>
       </html>

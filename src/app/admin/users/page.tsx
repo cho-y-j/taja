@@ -9,6 +9,7 @@ import {
   Crown,
   Coins,
   Activity,
+  RefreshCw,
 } from 'lucide-react';
 
 interface User {
@@ -42,6 +43,7 @@ export default function AdminUsersPage() {
   });
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const fetchUsers = async (page = 1, searchQuery = search) => {
     setIsLoading(true);
@@ -79,6 +81,25 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleSyncUsers = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/admin/sync-users', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`동기화 완료: ${data.synced}명 추가, ${data.skipped}명 스킵`);
+        fetchUsers(1);
+      } else {
+        alert('동기화 실패');
+      }
+    } catch (error) {
+      console.error('Sync failed:', error);
+      alert('동기화 중 오류 발생');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return (
     <div className="p-6">
       {/* 헤더 */}
@@ -91,6 +112,14 @@ export default function AdminUsersPage() {
             총 {pagination.total.toLocaleString()}명의 사용자
           </p>
         </div>
+        <button
+          onClick={handleSyncUsers}
+          disabled={isSyncing}
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
+        >
+          <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+          {isSyncing ? '동기화 중...' : 'Clerk 사용자 동기화'}
+        </button>
       </div>
 
       {/* 검색 */}
