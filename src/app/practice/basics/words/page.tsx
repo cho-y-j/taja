@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Play, Home, X, Globe } from 'lucide-react';
@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { MetricsDisplay } from '@/components/typing/metrics-display';
 import { useTypingEngine } from '@/hooks/use-typing-engine';
+import { useTTS } from '@/hooks/use-tts';
+import { useIMEInput } from '@/hooks/use-ime-input';
 import { wordLevels, getRandomWordsWithMeaning, type WordWithMeaning } from '@/lib/typing/word-practice';
 import { useThemeStore } from '@/stores/theme-store';
 
@@ -27,15 +29,8 @@ export default function WordPracticePage() {
 
   const currentLevelData = wordLevels[currentLevel - 1];
 
-  // TTS 함수
-  const speakWord = useCallback((word: string) => {
-    if (!word || typeof window === 'undefined' || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(word);
-    utterance.lang = language === 'ko' ? 'ko-KR' : 'en-US';
-    utterance.rate = 0.9;
-    window.speechSynthesis.speak(utterance);
-  }, [language]);
+  // TTS 훅
+  const { speak: speakWord } = useTTS({ language });
 
   // 연습 텍스트 생성
   useEffect(() => {
@@ -78,66 +73,35 @@ export default function WordPracticePage() {
     }
   }, [autoListen, currentWord, showLevelSelect, speakWord]);
 
-  const inputRef = useRef<HTMLInputElement>(null);
-  const isComposingRef = useRef(false);
-  const [inputValue, setInputValue] = useState('');
+  // IME 입력 처리 훅
+  const {
+    inputRef,
+    inputValue,
+    handleChange: handleInputChange,
+    handleCompositionStart,
+    handleCompositionEnd,
+    resetInput,
+    focus: focusInput,
+  } = useIMEInput({
+    onInput: processInput,
+    onBackspace: processBackspace,
+    onStart: startSession,
+    disabled: isPaused || isComplete,
+  });
 
   // userInput이 리셋되면 inputValue도 리셋
   useEffect(() => {
     if (userInput === '') {
-      setInputValue('');
+      resetInput();
     }
-  }, [userInput]);
-
-  // 한글 IME 조합 시작
-  const handleCompositionStart = useCallback(() => {
-    isComposingRef.current = true;
-  }, []);
-
-  // 한글 IME 조합 완료
-  const handleCompositionEnd = useCallback((e: React.CompositionEvent<HTMLInputElement>) => {
-    isComposingRef.current = false;
-    const value = e.currentTarget.value;
-    setInputValue(value);
-
-    const currentLen = userInput.length;
-    for (let i = currentLen; i < value.length; i++) {
-      processInput(value[i]);
-    }
-  }, [userInput, processInput]);
-
-  // 입력 변경 처리
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setInputValue(value);
-
-    if (!isStarted && value.length > 0) {
-      startSession();
-    }
-
-    if (isComposingRef.current) return;
-
-    if (value.length < userInput.length) {
-      const diff = userInput.length - value.length;
-      for (let i = 0; i < diff; i++) {
-        processBackspace();
-      }
-      return;
-    }
-
-    for (let i = userInput.length; i < value.length; i++) {
-      processInput(value[i]);
-    }
-  }, [isStarted, userInput, processInput, processBackspace, startSession]);
+  }, [userInput, resetInput]);
 
   // 연습 화면 진입 시 자동 포커스
   useEffect(() => {
-    if (!showLevelSelect && inputRef.current) {
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
+    if (!showLevelSelect) {
+      focusInput();
     }
-  }, [showLevelSelect, inputRef]);
+  }, [showLevelSelect, focusInput]);
 
   // 연습 시작
   const handleStart = useCallback(() => {
@@ -153,17 +117,17 @@ export default function WordPracticePage() {
     setWordsWithMeaning(words);
     setPracticeText(words.map(w => w.word).join(' '));
     reset();
-    setTimeout(() => inputRef.current?.focus(), 100);
-  }, [currentLevel, language, reset, inputRef]);
+    focusInput();
+  }, [currentLevel, language, reset, focusInput]);
 
   // 다음 레벨
   const handleNextLevel = useCallback(() => {
     if (currentLevel < wordLevels.length) {
       setCurrentLevel(currentLevel + 1);
       reset();
-      setTimeout(() => inputRef.current?.focus(), 100);
+      focusInput();
     }
-  }, [currentLevel, reset, inputRef]);
+  }, [currentLevel, reset, focusInput]);
 
   // 레벨 선택 화면으로
   const handleBackToSelect = useCallback(() => {
@@ -441,7 +405,7 @@ export default function WordPracticePage() {
                 onClick={() => {
                   setCurrentLevel(level.level);
                   reset();
-                  setTimeout(() => inputRef.current?.focus(), 100);
+                  focusInput();
                 }}
               >
                 Lv.{level.level}
