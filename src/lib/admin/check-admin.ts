@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 
 export type AdminRole = 'admin' | 'super_admin';
 
@@ -18,7 +18,21 @@ export async function checkAdmin(): Promise<AdminCheckResult> {
     return { isAdmin: false, role: null, userId: null };
   }
 
-  const role = (sessionClaims?.metadata as { role?: string })?.role as AdminRole | undefined;
+  // sessionClaims에서 먼저 확인
+  const metadata = sessionClaims?.metadata as Record<string, unknown> | undefined;
+  const publicMetadata = sessionClaims?.publicMetadata as Record<string, unknown> | undefined;
+  let role = (metadata?.role || publicMetadata?.role) as AdminRole | undefined;
+
+  // sessionClaims에 없으면 Clerk API로 직접 확인
+  if (!role) {
+    try {
+      const client = await clerkClient();
+      const user = await client.users.getUser(userId);
+      role = user.publicMetadata?.role as AdminRole | undefined;
+    } catch (error) {
+      console.error('Failed to fetch user metadata:', error);
+    }
+  }
 
   if (role === 'admin' || role === 'super_admin') {
     return { isAdmin: true, role, userId };
