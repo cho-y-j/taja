@@ -17,7 +17,7 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 // 관리자 전용 라우트
-const isAdminRoute = createRouteMatcher(['/admin(.*)']);
+const isAdminRoute = createRouteMatcher(['/admin(.*)', '/api/admin(.*)']);
 
 export default clerkMiddleware(async (auth, req) => {
   // 관리자 라우트 체크

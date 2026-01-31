@@ -1,68 +1,40 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { useAuth } from '@clerk/nextjs';
 import { Coins, Infinity as InfinityIcon, Sparkles } from 'lucide-react';
 import { useCreditStore } from '@/stores/credit-store';
 
-// Clerk 설정 여부 확인
-const CLERK_CONFIGURED =
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
-  !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.includes('여기에') &&
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.startsWith('pk_');
-
 export function CreditBalance() {
-  const { balance, hasSubscription, isLoading, fetchCredits, openUpgradeModal } =
+  const { isSignedIn, isLoaded } = useAuth();
+  const { balance, hasSubscription, isLoading, lastFetched, fetchCredits, openUpgradeModal } =
     useCreditStore();
-  const [isSignedIn, setIsSignedIn] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
 
-  // 로그인 상태 확인
+  // 로그인 상태가 확인되면 크레딧 조회 (store가 자체 캐시 관리)
   useEffect(() => {
-    if (!CLERK_CONFIGURED) {
-      setIsLoaded(true);
-      return;
+    if (isLoaded && isSignedIn) {
+      fetchCredits();
     }
-
-    const checkAuth = () => {
-      if (typeof window !== 'undefined') {
-        const clerk = (
-          window as unknown as { Clerk?: { session?: unknown } }
-        ).Clerk;
-        if (clerk) {
-          const signedIn = !!clerk.session;
-          setIsSignedIn(signedIn);
-          setIsLoaded(true);
-
-          // 로그인 상태면 크레딧 조회
-          if (signedIn) {
-            fetchCredits();
-          }
-        }
-      }
-    };
-
-    const interval = setInterval(checkAuth, 100);
-    setTimeout(() => {
-      clearInterval(interval);
-      setIsLoaded(true);
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [fetchCredits]);
+  }, [isLoaded, isSignedIn, fetchCredits]);
 
   // 로그인하지 않았으면 표시 안함
   if (!isLoaded || !isSignedIn) {
     return null;
   }
 
-  // 로딩 중
-  if (isLoading && balance === 0) {
+  // 첫 로딩 중에만 스켈레톤 표시 (이미 fetch한 적 있으면 스킵)
+  if (isLoading && !lastFetched) {
     return (
       <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[var(--color-surface)] rounded-lg border border-[var(--color-border)]">
         <div className="w-4 h-4 rounded-full bg-[var(--color-border)] animate-pulse" />
         <div className="w-8 h-3 rounded bg-[var(--color-border)] animate-pulse" />
       </div>
     );
+  }
+
+  // 아직 fetch하지 않았으면 표시 안함 (깜빡임 방지)
+  if (!lastFetched) {
+    return null;
   }
 
   // 구독자
