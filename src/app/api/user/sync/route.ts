@@ -60,8 +60,9 @@ export async function POST() {
     });
   } catch (error) {
     console.error('User sync error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to sync user' },
+      { error: 'Failed to sync user', details: errorMessage },
       { status: 500 }
     );
   }
