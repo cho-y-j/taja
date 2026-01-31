@@ -33,6 +33,10 @@ export function DocumentCreateView() {
   const [isExtractingUrl, setIsExtractingUrl] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [pendingFileContent, setPendingFileContent] = useState<{name: string; content: string} | null>(null);
+  const [structuredContent, setStructuredContent] = useState<{
+    words: Array<{ word: string; meaning: string; example: string }>;
+    sentences: Array<{ original: string; translation: string }>;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isEditing = !!editingDocumentId;
 
@@ -56,6 +60,10 @@ export function DocumentCreateView() {
 
       const data = await res.json();
       setDraft(data.title || aiPrompt.slice(0, 30), data.content, draftLanguage);
+      // 구조화된 데이터 저장
+      if (data.structured) {
+        setStructuredContent(data.structured);
+      }
     } catch (err) {
       setGenerationError(err instanceof Error ? err.message : 'AI 생성 오류');
     } finally {
@@ -87,6 +95,10 @@ export function DocumentCreateView() {
 
       const data = await res.json();
       setDraft(data.title || 'URL 단어장', data.content, draftLanguage);
+      // 구조화된 데이터 저장
+      if (data.structured) {
+        setStructuredContent(data.structured);
+      }
     } catch (err) {
       setUrlError(err instanceof Error ? err.message : 'URL 추출 오류');
     } finally {
@@ -118,6 +130,10 @@ export function DocumentCreateView() {
 
       const data = await res.json();
       setDraft(pendingFileContent.name + ' (AI 정리)', data.content, draftLanguage);
+      // 구조화된 데이터 저장
+      if (data.structured) {
+        setStructuredContent(data.structured);
+      }
       setPendingFileContent(null);
       setUploadInstruction('');
     } catch (err) {
@@ -193,8 +209,10 @@ export function DocumentCreateView() {
         name: draftName,
         content: draftContent,
         language: draftLanguage,
+        structured: structuredContent || undefined,
       });
       clearDraft();
+      setStructuredContent(null);
       selectDocument(editingDocumentId);
     } else {
       const doc = addDocument({
@@ -203,6 +221,7 @@ export function DocumentCreateView() {
         language: draftLanguage,
         source: createSource || 'manual',
         aiPrompt: createSource === 'ai' ? aiPrompt : undefined,
+        structured: structuredContent || undefined,
       });
 
       // DB에도 저장 (로그인된 경우)
@@ -224,6 +243,7 @@ export function DocumentCreateView() {
       }
 
       clearDraft();
+      setStructuredContent(null);
       selectDocument(doc.id);
     }
   }, [
@@ -234,6 +254,7 @@ export function DocumentCreateView() {
     editingDocumentId,
     createSource,
     aiPrompt,
+    structuredContent,
     addDocument,
     updateDocument,
     clearDraft,

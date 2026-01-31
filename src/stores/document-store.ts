@@ -1,6 +1,19 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+// 구조화된 학습 데이터
+export interface StructuredContent {
+  words: Array<{
+    word: string;
+    meaning: string;
+    example: string;
+  }>;
+  sentences: Array<{
+    original: string;
+    translation: string;
+  }>;
+}
+
 export interface UserDocument {
   id: string;
   name: string;
@@ -9,6 +22,8 @@ export interface UserDocument {
   source: 'manual' | 'upload' | 'ai' | 'url';
   aiPrompt?: string;
   sourceUrl?: string;
+  // 구조화된 학습 데이터 (단어, 문장 + 번역)
+  structured?: StructuredContent;
   translation?: string;
   summary?: string;
   // 번역 캐시: { "원문": "번역" }

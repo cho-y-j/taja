@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 
+// 구조화된 학습 문서 형식
+interface LearningDocument {
+  title: string;
+  words: Array<{
+    word: string;
+    meaning: string;
+    example: string;
+  }>;
+  sentences: Array<{
+    original: string;
+    translation: string;
+  }>;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { prompt, language = 'ko' } = await request.json();
@@ -21,41 +35,60 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const systemPrompt =
-      language === 'ko'
-        ? `당신은 한국어 타자 연습용 문서를 생성하는 도우미입니다.
-사용자의 요청에 맞는 자연스러운 한국어 텍스트를 생성해주세요.
-규칙:
-- 반드시 한국어로만 작성하세요. 영어 단어를 절대 포함하지 마세요.
-- 문서는 여러 문장으로 구성
-- 각 문장은 완전한 문장이어야 함
-- 타자 연습에 적합한 다양한 표현 사용
-- 마크다운 포맷 없이 순수 텍스트만 반환
-- 200~500자 분량
-- 제목도 함께 만들어주세요
-- 번역이나 해석을 절대 포함하지 마세요
+    // 영어 학습 문서 생성 (영어 단어/문장 + 한국어 번역)
+    const systemPromptEn = `You are a language learning content creator.
+Create a structured learning document with English words and sentences.
 
-응답 형식 (JSON):
-{"title": "제목", "content": "본문 내용"}`
-        : `You are a helper that generates documents for English typing practice.
-Generate natural English text based on the user's request.
+IMPORTANT: Return ONLY valid JSON, no other text.
+
+JSON Format:
+{
+  "title": "Document title in Korean",
+  "words": [
+    { "word": "English word", "meaning": "Korean meaning", "example": "English example sentence" }
+  ],
+  "sentences": [
+    { "original": "English sentence", "translation": "Korean translation" }
+  ]
+}
+
 Rules:
-- You MUST write ONLY in English. Do NOT include any Korean, Chinese, Japanese or other non-English text.
-- Do NOT include translations or explanations in any other language.
-- Document should contain multiple sentences
-- Each sentence must be complete and grammatically correct
-- Use varied vocabulary suitable for typing practice
-- Return plain text only, no markdown formatting
-- 200-500 characters
-- Include a title
+- Create 10-15 words with meanings and example sentences
+- Create 8-12 practice sentences with translations
+- Words should be relevant to the topic
+- Sentences should be natural and useful
+- All meanings and translations must be in Korean
+- Return ONLY the JSON object, nothing else`;
 
-Response format (JSON):
-{"title": "Title here", "content": "Body content here"}`;
+    // 한국어 학습 문서 생성 (한국어 단어/문장 + 영어 번역)
+    const systemPromptKo = `당신은 한국어 학습 콘텐츠 제작자입니다.
+한국어 단어와 문장으로 구성된 구조화된 학습 문서를 만들어주세요.
 
-    const userPrompt =
-      language === 'ko'
-        ? `다음 요청에 맞는 타자 연습용 문서를 한국어로만 만들어주세요 (영어 포함 금지): "${prompt}"`
-        : `Create a typing practice document in English ONLY (no other languages): "${prompt}"`;
+중요: 오직 유효한 JSON만 반환하세요. 다른 텍스트는 포함하지 마세요.
+
+JSON 형식:
+{
+  "title": "문서 제목",
+  "words": [
+    { "word": "한국어 단어", "meaning": "영어 뜻", "example": "한국어 예문" }
+  ],
+  "sentences": [
+    { "original": "한국어 문장", "translation": "English translation" }
+  ]
+}
+
+규칙:
+- 10-15개의 단어와 뜻, 예문을 생성
+- 8-12개의 연습 문장과 번역을 생성
+- 단어는 주제와 관련된 것으로
+- 문장은 자연스럽고 실용적으로
+- 뜻과 번역은 영어로
+- JSON 객체만 반환, 다른 텍스트 없이`;
+
+    const systemPrompt = language === 'en' ? systemPromptEn : systemPromptKo;
+    const userPrompt = language === 'en'
+      ? `Create a learning document about: "${prompt}"`
+      : `다음 주제로 학습 문서를 만들어주세요: "${prompt}"`;
 
     const response = await fetch(DEEPSEEK_API_URL, {
       method: 'POST',
@@ -70,7 +103,7 @@ Response format (JSON):
           { role: 'user', content: userPrompt },
         ],
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: 2500,
       }),
     });
 
@@ -86,34 +119,50 @@ Response format (JSON):
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || '';
 
-    // Try to parse JSON response
-    let title = '';
-    let body = '';
+    // JSON 파싱 시도
+    let doc: LearningDocument | null = null;
     try {
+      // JSON 부분 추출
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        title = parsed.title || '';
-        body = parsed.content || '';
+        doc = JSON.parse(jsonMatch[0]);
       }
-    } catch {
-      // Fallback: use raw content
+    } catch (e) {
+      console.error('JSON 파싱 실패:', e);
     }
 
-    if (!body) {
-      // Fallback: use entire response as body
-      body = content
-        .replace(/^```[\s\S]*?```$/gm, '')
-        .replace(/\{[\s\S]*?\}/g, '')
-        .trim();
-      if (!body) body = content;
+    // 파싱 실패 시 기본 형식으로 변환
+    if (!doc || !doc.words || !doc.sentences) {
+      // Fallback: 기존 텍스트 형식으로 처리
+      const lines = content.split('\n').filter((l: string) => l.trim());
+      doc = {
+        title: prompt.slice(0, 30),
+        words: [],
+        sentences: lines.slice(0, 10).map((line: string) => ({
+          original: line.trim(),
+          translation: '',
+        })),
+      };
     }
 
-    if (!title) {
-      title = prompt.slice(0, 30);
-    }
+    // 기존 형식과 호환을 위해 content도 생성
+    const textContent = [
+      '## 단어',
+      ...doc.words.map(w => `${w.word} - ${w.meaning}`),
+      '',
+      '## 문장',
+      ...doc.sentences.map(s => s.original),
+    ].join('\n');
 
-    return NextResponse.json({ title, content: body.trim() });
+    return NextResponse.json({
+      title: doc.title,
+      content: textContent,
+      // 구조화된 데이터
+      structured: {
+        words: doc.words,
+        sentences: doc.sentences,
+      },
+    });
   } catch (error) {
     console.error('Error generating document:', error);
     return NextResponse.json(

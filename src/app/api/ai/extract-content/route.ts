@@ -57,45 +57,82 @@ async function fetchYoutubeTranscript(videoId: string): Promise<string> {
   }
 }
 
-// AI로 단어장과 문장 생성
+// 구조화된 학습 문서 형식
+interface LearningDocument {
+  title: string;
+  words: Array<{
+    word: string;
+    meaning: string;
+    example: string;
+  }>;
+  sentences: Array<{
+    original: string;
+    translation: string;
+  }>;
+}
+
+// AI로 구조화된 단어장과 문장 생성
 async function generateVocabAndSentences(
   content: string,
   language: 'ko' | 'en',
   sourceType: string,
   customInstruction?: string
-): Promise<{ title: string; content: string }> {
-  // 커스텀 지시사항이 있으면 사용, 없으면 기본 지시사항
-  const defaultInstruction = language === 'ko'
-    ? `주어진 텍스트에서 중요한 단어와 문장을 추출하여 타자 연습용 학습 자료를 만들어주세요.
+): Promise<{ title: string; content: string; structured: { words: LearningDocument['words']; sentences: LearningDocument['sentences'] } }> {
 
-다음 형식으로 작성해주세요:
-1. 먼저 "## 주요 단어" 섹션에 중요 단어 10-20개를 나열 (한 줄에 하나씩)
-2. 그 다음 "## 핵심 문장" 섹션에 핵심 문장 10-15개를 나열 (한 줄에 하나씩)
+  // 영어 콘텐츠에서 추출 (영어 단어/문장 + 한국어 번역)
+  const systemPromptEn = `You are a language learning content extractor.
+Extract words and sentences from the given text and create a structured learning document.
 
-단어와 문장은 원본 텍스트에서 직접 추출하세요.
-타자 연습에 적합하도록 너무 긴 문장은 피해주세요.`
-    : `Extract important words and sentences from the given text to create typing practice material.
+${customInstruction ? `User instruction: ${customInstruction}\n` : ''}
 
-Format your response as follows:
-1. First, list 10-20 important words under "## Key Words" (one per line)
-2. Then, list 10-15 key sentences under "## Key Sentences" (one per line)
+IMPORTANT: Return ONLY valid JSON, no other text.
 
-Extract words and sentences directly from the original text.
-Avoid overly long sentences to make them suitable for typing practice.`;
+JSON Format:
+{
+  "title": "Document title in Korean",
+  "words": [
+    { "word": "English word from text", "meaning": "Korean meaning", "example": "Example sentence from text" }
+  ],
+  "sentences": [
+    { "original": "English sentence from text", "translation": "Korean translation" }
+  ]
+}
 
-  const systemPrompt = language === 'ko'
-    ? `당신은 한국어 학습 콘텐츠를 만드는 전문가입니다.
-${customInstruction || defaultInstruction}
+Rules:
+- Extract 10-15 important words with meanings and example sentences
+- Extract 8-12 useful sentences with translations
+- All meanings and translations must be in Korean
+- Keep sentences concise (under 100 characters)
+- Return ONLY the JSON object`;
 
-결과물은 타자 연습에 사용됩니다. 너무 긴 문장은 피하고, 학습에 유용한 내용을 중심으로 작성해주세요.`
-    : `You are an expert at creating English learning content.
-${customInstruction || defaultInstruction}
+  // 한국어 콘텐츠에서 추출 (한국어 단어/문장 + 영어 번역)
+  const systemPromptKo = `당신은 학습 콘텐츠 추출 전문가입니다.
+주어진 텍스트에서 단어와 문장을 추출하여 구조화된 학습 문서를 만들어주세요.
 
-The output will be used for typing practice. Avoid overly long sentences and focus on useful learning content.`;
+${customInstruction ? `사용자 지시사항: ${customInstruction}\n` : ''}
 
-  const userPrompt = customInstruction
-    ? `다음 ${sourceType}에서 추출한 텍스트입니다. 사용자의 지시사항에 따라 처리해주세요:\n\n${content}`
-    : `다음 ${sourceType}에서 추출한 텍스트입니다. 단어장과 핵심 문장을 만들어주세요:\n\n${content}`;
+중요: 오직 유효한 JSON만 반환하세요. 다른 텍스트는 포함하지 마세요.
+
+JSON 형식:
+{
+  "title": "문서 제목",
+  "words": [
+    { "word": "텍스트에서 추출한 한국어 단어", "meaning": "English meaning", "example": "텍스트에서 추출한 예문" }
+  ],
+  "sentences": [
+    { "original": "텍스트에서 추출한 한국어 문장", "translation": "English translation" }
+  ]
+}
+
+규칙:
+- 10-15개의 중요 단어와 뜻, 예문 추출
+- 8-12개의 유용한 문장과 번역 추출
+- 뜻과 번역은 영어로
+- 문장은 100자 이내로 간결하게
+- JSON 객체만 반환`;
+
+  const systemPrompt = language === 'en' ? systemPromptEn : systemPromptKo;
+  const userPrompt = `다음 ${sourceType}에서 추출한 텍스트입니다:\n\n${content.slice(0, 8000)}`;
 
   const response = await fetch(DEEPSEEK_API_URL, {
     method: 'POST',
@@ -110,7 +147,7 @@ The output will be used for typing practice. Avoid overly long sentences and foc
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.7,
-      max_tokens: 2000,
+      max_tokens: 2500,
     }),
   });
 
@@ -121,9 +158,46 @@ The output will be used for typing practice. Avoid overly long sentences and foc
   const data = await response.json();
   const generatedContent = data.choices[0]?.message?.content || '';
 
+  // JSON 파싱 시도
+  let doc: LearningDocument | null = null;
+  try {
+    const jsonMatch = generatedContent.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      doc = JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    console.error('JSON 파싱 실패:', e);
+  }
+
+  // 파싱 실패 시 기본 형식
+  if (!doc || !doc.words || !doc.sentences) {
+    const lines = generatedContent.split('\n').filter((l: string) => l.trim());
+    doc = {
+      title: sourceType === '유튜브 영상' ? '유튜브 단어장' : '웹페이지 단어장',
+      words: [],
+      sentences: lines.slice(0, 10).map((line: string) => ({
+        original: line.trim(),
+        translation: '',
+      })),
+    };
+  }
+
+  // 텍스트 형식도 생성 (호환용)
+  const textContent = [
+    '## 단어',
+    ...doc.words.map(w => `${w.word} - ${w.meaning}`),
+    '',
+    '## 문장',
+    ...doc.sentences.map(s => s.original),
+  ].join('\n');
+
   return {
-    title: sourceType === '유튜브 영상' ? '유튜브 단어장' : '웹페이지 단어장',
-    content: generatedContent,
+    title: doc.title,
+    content: textContent,
+    structured: {
+      words: doc.words,
+      sentences: doc.sentences,
+    },
   };
 }
 
@@ -173,6 +247,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       title: result.title,
       content: result.content,
+      structured: result.structured,
       sourceType,
       originalLength: content.length,
     });
