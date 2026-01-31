@@ -389,7 +389,7 @@ export default function KeyboardPracticePage() {
         {/* Typing area - relative for overlay */}
         <div className="relative shrink-0 mb-2">
           {/* 목표 텍스트 (위) */}
-          <div className="text-lg leading-[2] p-3 bg-[var(--color-surface)] rounded-lg border border-[var(--color-border)] mb-2 font-mono tracking-wide max-h-24 overflow-auto">
+          <div className="typing-text-display p-3 bg-[var(--color-surface)] rounded-lg border border-[var(--color-border)] mb-2 max-h-32 overflow-auto">
             {getCharacterFeedback().map((item, index) => (
               <span
                 key={index}

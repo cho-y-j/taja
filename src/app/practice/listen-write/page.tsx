@@ -465,7 +465,7 @@ export default function ListenWritePracticePage() {
         <Card className="mb-6">
           <CardContent className="py-6">
             {/* 진행 상황 표시 (위) - 타이핑한 글자만 보여주고 나머지는 ● */}
-            <div className="font-mono text-2xl leading-relaxed tracking-wide p-4 bg-gray-50 rounded-lg border border-[var(--color-border)] mb-4 min-h-[80px]">
+            <div className="typing-text-display typing-text-lg p-4 bg-gray-50 rounded-lg border border-[var(--color-border)] mb-4 min-h-[80px]">
               {practiceText.split('').map((targetChar, index) => {
                 if (index < currentIndex) {
                   const isError = errors.includes(index);

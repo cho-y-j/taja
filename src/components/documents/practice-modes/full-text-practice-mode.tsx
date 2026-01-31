@@ -433,7 +433,7 @@ export function FullTextPracticeMode({ document: doc }: Props) {
         <Card className="mb-4">
           <CardContent className="py-6">
             {/* Target paragraph */}
-            <div className="text-lg leading-relaxed mb-6 font-mono tracking-wide min-h-[100px] max-h-[200px] overflow-auto">
+            <div className="typing-text-display typing-text-md mb-6 min-h-[100px] max-h-[200px] overflow-auto">
               {feedback.map((item, index) => (
                 <span
                   key={index}

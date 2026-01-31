@@ -498,7 +498,7 @@ export function SentencePracticeMode({ document: doc }: Props) {
         <Card className="mb-4">
           <CardContent className="py-6">
             {/* Target sentence */}
-            <div className="text-xl leading-relaxed mb-2 font-mono tracking-wide min-h-[80px]">
+            <div className="typing-text-display typing-text-lg mb-2 min-h-[80px]">
               {feedback.map((item, index) => (
                 <span
                   key={index}

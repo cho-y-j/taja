@@ -501,7 +501,7 @@ export function WordPracticeMode({ document: doc }: Props) {
         <Card className="mb-4">
           <CardContent className="py-6">
             {/* Target word */}
-            <div className="text-4xl leading-relaxed mb-2 font-mono tracking-wide text-center min-h-[60px]">
+            <div className="typing-text-display typing-text-2xl mb-2 text-center min-h-[60px]">
               {feedback.map((item, index) => (
                 <span
                   key={index}

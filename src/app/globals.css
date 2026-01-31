@@ -77,6 +77,13 @@
   --typing-error: #FF6B6B;
   --typing-current: #4A90D9;
   --typing-pending: #CBD5E0;
+
+  /* 반응형 타이핑 텍스트 크기 */
+  --typing-text-sm: clamp(0.875rem, 2vw, 1rem);
+  --typing-text-md: clamp(1rem, 2.5vw, 1.25rem);
+  --typing-text-lg: clamp(1.25rem, 3vw, 1.5rem);
+  --typing-text-xl: clamp(1.5rem, 4vw, 2rem);
+  --typing-text-2xl: clamp(1.75rem, 5vw, 2.5rem);
 }
 
 /* ===== Senior 테마 (차분하고 명확한) ===== */
@@ -225,6 +232,44 @@ body {
   opacity: 0.8;
   pointer-events: none;
   white-space: nowrap;
+}
+
+/* ===== 타이핑 텍스트 공통 스타일 ===== */
+.typing-text {
+  word-break: break-word;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  line-height: 2;
+}
+
+.typing-text-display {
+  font-family: var(--font-mono);
+  font-size: var(--typing-text-lg);
+  letter-spacing: 0.05em;
+  word-break: break-word;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  line-height: 2;
+}
+
+.typing-text-sm {
+  font-size: var(--typing-text-sm);
+}
+
+.typing-text-md {
+  font-size: var(--typing-text-md);
+}
+
+.typing-text-lg {
+  font-size: var(--typing-text-lg);
+}
+
+.typing-text-xl {
+  font-size: var(--typing-text-xl);
+}
+
+.typing-text-2xl {
+  font-size: var(--typing-text-2xl);
 }
 
 /* ===== 버튼 스타일 ===== */

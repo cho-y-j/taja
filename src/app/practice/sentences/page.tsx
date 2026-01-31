@@ -585,7 +585,7 @@ export default function SentencePracticePage() {
           <Card className="mb-4">
             <CardContent className="py-6">
               {/* 문장 표시 */}
-              <div className="text-2xl leading-relaxed mb-2 font-mono tracking-wide min-h-[80px]">
+              <div className="typing-text-display typing-text-lg mb-2 min-h-[80px]">
                 {feedback.map((item, index) => (
                   <span
                     key={index}

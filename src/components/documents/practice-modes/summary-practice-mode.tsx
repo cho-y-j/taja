@@ -505,7 +505,7 @@ export function SummaryPracticeMode({ document: doc }: Props) {
         <Card className="mb-4">
           <CardContent className="py-6">
             {/* Target summary */}
-            <div className="text-lg leading-relaxed mb-6 font-mono tracking-wide min-h-[80px]">
+            <div className="typing-text-display typing-text-md mb-6 min-h-[80px]">
               {feedback.map((item, index) => (
                 <span
                   key={index}

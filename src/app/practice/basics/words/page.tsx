@@ -318,7 +318,7 @@ export default function WordPracticePage() {
         <Card className="mb-6">
           <CardContent className="py-6">
             {/* 목표 텍스트 (위) */}
-            <div className="text-2xl leading-relaxed mb-2 font-mono tracking-wide min-h-[60px] text-center">
+            <div className="typing-text-display typing-text-xl mb-2 min-h-[60px] text-center">
               {getCharacterFeedback().map((item, index) => (
                 <span
                   key={index}
