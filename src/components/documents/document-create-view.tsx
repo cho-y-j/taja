@@ -185,7 +185,7 @@ export function DocumentCreateView() {
   );
 
   // 저장
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (!draftName.trim() || !draftContent.trim()) return;
 
     if (isEditing && editingDocumentId) {
@@ -204,6 +204,25 @@ export function DocumentCreateView() {
         source: createSource || 'manual',
         aiPrompt: createSource === 'ai' ? aiPrompt : undefined,
       });
+
+      // DB에도 저장 (로그인된 경우)
+      try {
+        const clerk = (window as unknown as { Clerk?: { session?: unknown } }).Clerk;
+        if (clerk?.session) {
+          await fetch('/api/user/documents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: draftName,
+              originalText: draftContent,
+              locale: draftLanguage,
+            }),
+          });
+        }
+      } catch (e) {
+        console.error('DB 저장 실패:', e);
+      }
+
       clearDraft();
       selectDocument(doc.id);
     }
