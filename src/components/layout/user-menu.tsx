@@ -4,11 +4,33 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { User, LogOut, BarChart2, ChevronDown, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useThemeStore } from '@/stores/theme-store';
 
 // Clerk 설정 여부 확인
 const CLERK_CONFIGURED = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
   !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.includes('여기에') &&
   process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.startsWith('pk_');
+
+const content = {
+  ko: {
+    login: '로그인',
+    signup: '회원가입',
+    member: '회원',
+    myPage: '마이페이지',
+    stats: '학습 통계',
+    pricing: '요금제',
+    logout: '로그아웃',
+  },
+  en: {
+    login: 'Sign In',
+    signup: 'Sign Up',
+    member: 'Member',
+    myPage: 'My Page',
+    stats: 'Statistics',
+    pricing: 'Pricing',
+    logout: 'Sign Out',
+  },
+};
 
 interface UserData {
   firstName?: string | null;
@@ -21,6 +43,8 @@ export function UserMenu() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
   const [signOutFn, setSignOutFn] = useState<(() => void) | null>(null);
+  const { uiLanguage } = useThemeStore();
+  const t = content[uiLanguage];
 
   useEffect(() => {
     if (!CLERK_CONFIGURED) {
@@ -63,7 +87,7 @@ export function UserMenu() {
       <div className="flex items-center gap-2">
         <Link href="/sign-in">
           <Button variant="ghost" size="sm">
-            로그인
+            {t.login}
           </Button>
         </Link>
       </div>
@@ -81,12 +105,12 @@ export function UserMenu() {
       <div className="flex items-center gap-2">
         <Link href="/sign-in">
           <Button variant="ghost" size="sm">
-            로그인
+            {t.login}
           </Button>
         </Link>
         <Link href="/sign-up">
           <Button size="sm">
-            회원가입
+            {t.signup}
           </Button>
         </Link>
       </div>
@@ -117,7 +141,7 @@ export function UserMenu() {
           {user?.firstName?.charAt(0) || user?.emailAddresses[0]?.emailAddress?.charAt(0)?.toUpperCase() || 'U'}
         </div>
         <span className="text-sm font-medium text-[var(--color-text)] hidden sm:block">
-          {user?.firstName || user?.emailAddresses[0]?.emailAddress?.split('@')[0] || '회원'}
+          {user?.firstName || user?.emailAddresses[0]?.emailAddress?.split('@')[0] || t.member}
         </span>
         <ChevronDown className={`w-4 h-4 text-[var(--color-text-muted)] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
@@ -132,7 +156,7 @@ export function UserMenu() {
           <div className="absolute right-0 top-full mt-2 w-56 bg-[var(--color-surface)] rounded-xl shadow-lg border border-[var(--color-border)] z-20 overflow-hidden">
             <div className="px-4 py-3 border-b border-[var(--color-border)]">
               <p className="text-sm font-medium text-[var(--color-text)]">
-                {user?.firstName || '회원'}
+                {user?.firstName || t.member}
               </p>
               <p className="text-xs text-[var(--color-text-muted)] truncate">
                 {user?.emailAddresses[0]?.emailAddress || ''}
@@ -146,7 +170,7 @@ export function UserMenu() {
                 className="flex items-center gap-3 px-4 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-background)] transition-colors"
               >
                 <User className="w-4 h-4" />
-                마이페이지
+                {t.myPage}
               </Link>
               <Link
                 href="/my/stats"
@@ -154,7 +178,7 @@ export function UserMenu() {
                 className="flex items-center gap-3 px-4 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-background)] transition-colors"
               >
                 <BarChart2 className="w-4 h-4" />
-                학습 통계
+                {t.stats}
               </Link>
               <Link
                 href="/pricing"
@@ -162,7 +186,7 @@ export function UserMenu() {
                 className="flex items-center gap-3 px-4 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-background)] transition-colors"
               >
                 <CreditCard className="w-4 h-4" />
-                요금제
+                {t.pricing}
               </Link>
             </div>
 
@@ -175,7 +199,7 @@ export function UserMenu() {
                 className="flex items-center gap-3 px-4 py-2 text-sm text-[var(--color-error)] hover:bg-[var(--color-background)] transition-colors w-full"
               >
                 <LogOut className="w-4 h-4" />
-                로그아웃
+                {t.logout}
               </button>
             </div>
           </div>

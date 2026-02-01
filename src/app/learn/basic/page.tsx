@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -15,21 +15,52 @@ import {
 } from 'lucide-react';
 import { useThemeStore } from '@/stores/theme-store';
 
+const content = {
+  ko: {
+    pageTitle: '기본 연습',
+    completed: '완료',
+    completedOf: '완료',
+    totalProgress: '전체 진행도',
+    freeMode: '모든 연습을 자유롭게 선택할 수 있어요!',
+    korean: '한글',
+    english: '영문',
+    nodes: [
+      { title: '자리 익히기', description: '기본 손가락 위치를 익혀보세요' },
+      { title: '단어 연습', description: '자주 사용하는 단어로 연습해요' },
+      { title: '문장 연습', description: '다양한 문장을 타이핑해보세요' },
+      { title: '듣고 쓰기', description: '들려주는 문장을 받아쓰기' },
+      { title: '보고 말하기', description: '화면의 문장을 읽어보세요' },
+    ],
+  },
+  en: {
+    pageTitle: 'Basic Practice',
+    completed: 'Done',
+    completedOf: 'completed',
+    totalProgress: 'Overall Progress',
+    freeMode: 'Choose any practice freely!',
+    korean: 'Korean',
+    english: 'English',
+    nodes: [
+      { title: 'Home Row', description: 'Learn the basic finger positions' },
+      { title: 'Words', description: 'Practice with common words' },
+      { title: 'Sentences', description: 'Type various sentences' },
+      { title: 'Dictation', description: 'Write what you hear' },
+      { title: 'Read Aloud', description: 'Read sentences on screen' },
+    ],
+  },
+};
+
 interface PracticeNode {
   id: string;
-  title: string;
-  description: string;
   icon: typeof Keyboard;
   href: string;
   status: 'completed' | 'current' | 'available' | 'locked';
   color: string;
 }
 
-const practiceNodes: PracticeNode[] = [
+const practiceNodeBase: PracticeNode[] = [
   {
     id: 'home-row',
-    title: '자리 익히기',
-    description: '기본 손가락 위치를 익혀보세요',
     icon: Keyboard,
     href: '/practice/basics/home-row',
     status: 'available',
@@ -37,8 +68,6 @@ const practiceNodes: PracticeNode[] = [
   },
   {
     id: 'words',
-    title: '단어 연습',
-    description: '자주 사용하는 단어로 연습해요',
     icon: Type,
     href: '/practice/basics/words',
     status: 'available',
@@ -46,8 +75,6 @@ const practiceNodes: PracticeNode[] = [
   },
   {
     id: 'sentences',
-    title: '문장 연습',
-    description: '다양한 문장을 타이핑해보세요',
     icon: FileText,
     href: '/practice/sentences',
     status: 'available',
@@ -55,8 +82,6 @@ const practiceNodes: PracticeNode[] = [
   },
   {
     id: 'listen-write',
-    title: '듣고 쓰기',
-    description: '들려주는 문장을 받아쓰기',
     icon: Headphones,
     href: '/practice/listen-write',
     status: 'available',
@@ -64,8 +89,6 @@ const practiceNodes: PracticeNode[] = [
   },
   {
     id: 'speak',
-    title: '보고 말하기',
-    description: '화면의 문장을 읽어보세요',
     icon: Mic,
     href: '/practice/speak',
     status: 'available',
@@ -75,7 +98,12 @@ const practiceNodes: PracticeNode[] = [
 
 export default function BasicPracticePage() {
   const router = useRouter();
-  const { language } = useThemeStore();
+  const { language, uiLanguage } = useThemeStore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // 언어가 선택되지 않았다면 홈으로 리다이렉트
   useEffect(() => {
@@ -92,12 +120,15 @@ export default function BasicPracticePage() {
     );
   }
 
+  const lang = mounted ? uiLanguage : 'ko';
+  const t = content[lang];
+
   // 전체 진행도 계산 (데모용으로 0%)
   const progress = 0;
   const completedCount = 0;
-  const totalCount = practiceNodes.length;
+  const totalCount = practiceNodeBase.length;
 
-  const languageLabel = language === 'ko' ? '한글' : '영문';
+  const languageLabel = language === 'ko' ? t.korean : t.english;
 
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
@@ -112,10 +143,10 @@ export default function BasicPracticePage() {
           </Link>
           <div className="flex-1">
             <h1 className="text-lg font-bold text-[var(--color-text)]">
-              기본 연습 ({languageLabel})
+              {t.pageTitle} ({languageLabel})
             </h1>
             <p className="text-xs text-[var(--color-text-muted)]">
-              {completedCount} / {totalCount} 완료
+              {completedCount} / {totalCount} {t.completedOf}
             </p>
           </div>
         </div>
@@ -127,7 +158,7 @@ export default function BasicPracticePage() {
         <section className="mb-8 animate-fade-in">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-[var(--color-text-muted)]">
-              전체 진행도
+              {t.totalProgress}
             </span>
             <span className="text-sm font-bold text-[var(--color-primary)]">
               {progress}%
@@ -142,14 +173,14 @@ export default function BasicPracticePage() {
         <section className="mb-6 animate-fade-in" style={{ animationDelay: '0.1s' }}>
           <div className="card p-4 border-l-4 border-l-[var(--color-primary)]">
             <p className="text-sm text-[var(--color-text)]">
-              모든 연습을 자유롭게 선택할 수 있어요!
+              {t.freeMode}
             </p>
           </div>
         </section>
 
         {/* 학습 맵 */}
         <section className="space-y-4">
-          {practiceNodes.map((node, index) => (
+          {practiceNodeBase.map((node, index) => (
             <Link
               key={node.id}
               href={node.href}
@@ -189,21 +220,21 @@ export default function BasicPracticePage() {
                         ? 'text-[var(--color-text-light)]'
                         : 'text-[var(--color-text)]'
                     }`}>
-                      {node.title}
+                      {t.nodes[index].title}
                     </h3>
                     <p className={`text-sm ${
                       node.status === 'locked'
                         ? 'text-[var(--color-text-light)]'
                         : 'text-[var(--color-text-muted)]'
                     }`}>
-                      {node.description}
+                      {t.nodes[index].description}
                     </p>
                   </div>
 
                   {/* 상태 뱃지 */}
                   {node.status === 'completed' && (
                     <span className="badge badge-success">
-                      완료
+                      {t.completed}
                     </span>
                   )}
                 </div>

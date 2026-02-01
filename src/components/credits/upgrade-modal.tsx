@@ -3,11 +3,63 @@
 import Link from 'next/link';
 import { X, Coins, Crown, Sparkles, Check, ExternalLink } from 'lucide-react';
 import { useCreditStore } from '@/stores/credit-store';
+import { useThemeStore } from '@/stores/theme-store';
 import { Button } from '@/components/ui/button';
+
+const content = {
+  ko: {
+    subscribed: '현재 구독 중',
+    aiCredits: 'AI 크레딧',
+    unlimitedAI: '무제한 AI 기능을 이용하세요',
+    balance: '잔액:',
+    credits: '크레딧',
+    recommended: '추천',
+    monthlyPlan: '월간 구독',
+    unlimitedUse: 'AI 기능 무제한 사용',
+    price: '1,000원',
+    perMonth: '/월',
+    aiTranslate: 'AI 번역 무제한',
+    aiGenerate: 'AI 문서 생성 무제한',
+    urlExtract: 'URL/유튜브 콘텐츠 추출',
+    subscribeNow: '구독하기',
+    alreadySubscribed: '구독 중',
+    paymentSoon: '결제 기능은 곧 오픈 예정입니다!',
+    creditRecharge: '크레딧 충전',
+    creditInfo: '1 크레딧 = 약 10,000 토큰 (AI 요청 1~3회 분량).',
+    freeCredits: '신규 가입 시 200 크레딧이 무료로 제공됩니다.',
+    viewPricing: '요금제 자세히 보기',
+    later: '나중에 할게요',
+  },
+  en: {
+    subscribed: 'Currently Subscribed',
+    aiCredits: 'AI Credits',
+    unlimitedAI: 'Enjoy unlimited AI features',
+    balance: 'Balance:',
+    credits: 'credits',
+    recommended: 'Best',
+    monthlyPlan: 'Monthly Plan',
+    unlimitedUse: 'Unlimited AI features',
+    price: '$1',
+    perMonth: '/mo',
+    aiTranslate: 'Unlimited AI translation',
+    aiGenerate: 'Unlimited AI document generation',
+    urlExtract: 'URL/YouTube content extraction',
+    subscribeNow: 'Subscribe',
+    alreadySubscribed: 'Subscribed',
+    paymentSoon: 'Payment feature coming soon!',
+    creditRecharge: 'Buy Credits',
+    creditInfo: '1 credit ≈ 10,000 tokens (1-3 AI requests).',
+    freeCredits: 'New users receive 200 free credits.',
+    viewPricing: 'View Pricing Details',
+    later: 'Maybe Later',
+  },
+};
 
 export function UpgradeModal() {
   const { showUpgradeModal, closeUpgradeModal, balance, hasSubscription } =
     useCreditStore();
+  const { uiLanguage } = useThemeStore();
+  const t = content[uiLanguage];
 
   if (!showUpgradeModal) {
     return null;
@@ -42,12 +94,12 @@ export function UpgradeModal() {
             </div>
             <div>
               <h2 className="text-xl font-bold">
-                {hasSubscription ? '현재 구독 중' : 'AI 크레딧'}
+                {hasSubscription ? t.subscribed : t.aiCredits}
               </h2>
               <p className="text-sm opacity-80">
                 {hasSubscription
-                  ? '무제한 AI 기능을 이용하세요'
-                  : `잔액: ${balance} 크레딧`}
+                  ? t.unlimitedAI
+                  : `${t.balance} ${balance} ${t.credits}`}
               </p>
             </div>
           </div>
@@ -58,66 +110,64 @@ export function UpgradeModal() {
           {/* 구독 플랜 */}
           <div className="border-2 border-[var(--color-primary)] rounded-xl p-4 relative">
             <div className="absolute -top-3 left-4 bg-[var(--color-primary)] text-white text-xs font-bold px-2 py-0.5 rounded-full">
-              추천
+              {t.recommended}
             </div>
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className="font-bold text-[var(--color-text)]">
-                  월간 구독
+                  {t.monthlyPlan}
                 </h3>
                 <p className="text-sm text-[var(--color-text-muted)]">
-                  AI 기능 무제한 사용
+                  {t.unlimitedUse}
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-2xl font-bold text-[var(--color-primary)]">
-                  1,000원
+                  {t.price}
                 </p>
-                <p className="text-xs text-[var(--color-text-muted)]">/월</p>
+                <p className="text-xs text-[var(--color-text-muted)]">{t.perMonth}</p>
               </div>
             </div>
             <ul className="space-y-2 mb-4">
               <li className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
                 <Check className="w-4 h-4 text-[var(--color-success)]" />
-                AI 번역 무제한
+                {t.aiTranslate}
               </li>
               <li className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
                 <Check className="w-4 h-4 text-[var(--color-success)]" />
-                AI 문서 생성 무제한
+                {t.aiGenerate}
               </li>
               <li className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
                 <Check className="w-4 h-4 text-[var(--color-success)]" />
-                URL/유튜브 콘텐츠 추출
+                {t.urlExtract}
               </li>
             </ul>
             <Button
               className="w-full"
               disabled={hasSubscription}
               onClick={() => {
-                // TODO: 결제 연동 후 구현
-                alert('결제 기능은 곧 오픈 예정입니다!');
+                alert(t.paymentSoon);
               }}
             >
-              {hasSubscription ? '구독 중' : '구독하기'}
+              {hasSubscription ? t.alreadySubscribed : t.subscribeNow}
             </Button>
           </div>
 
           {/* 크레딧 팩 */}
           <div className="border border-[var(--color-border)] rounded-xl p-4">
             <h3 className="font-bold text-[var(--color-text)] mb-3">
-              크레딧 충전
+              {t.creditRecharge}
             </h3>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { amount: 100, price: 500 },
-                { amount: 500, price: 2000 },
-                { amount: 1000, price: 3500 },
+                { amount: 100, price: uiLanguage === 'ko' ? '500원' : '$0.50' },
+                { amount: 500, price: uiLanguage === 'ko' ? '2,000원' : '$2' },
+                { amount: 1000, price: uiLanguage === 'ko' ? '3,500원' : '$3.50' },
               ].map((pack) => (
                 <button
                   key={pack.amount}
                   onClick={() => {
-                    // TODO: 결제 연동 후 구현
-                    alert('결제 기능은 곧 오픈 예정입니다!');
+                    alert(t.paymentSoon);
                   }}
                   className="p-3 rounded-lg border border-[var(--color-border)] hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 transition-colors text-center"
                 >
@@ -128,7 +178,7 @@ export function UpgradeModal() {
                     </span>
                   </div>
                   <p className="text-xs text-[var(--color-text-muted)]">
-                    {pack.price.toLocaleString()}원
+                    {pack.price}
                   </p>
                 </button>
               ))}
@@ -140,9 +190,9 @@ export function UpgradeModal() {
             <p className="text-xs text-[var(--color-text-muted)] flex items-start gap-2">
               <Sparkles className="w-4 h-4 flex-shrink-0 mt-0.5" />
               <span>
-                1 크레딧 = 약 10,000 토큰 (AI 요청 1~3회 분량).
+                {t.creditInfo}
                 <br />
-                신규 가입 시 200 크레딧이 무료로 제공됩니다.
+                {t.freeCredits}
               </span>
             </p>
           </div>
@@ -155,14 +205,14 @@ export function UpgradeModal() {
             onClick={closeUpgradeModal}
             className="flex items-center justify-center gap-2 w-full text-sm text-[var(--color-primary)] font-medium hover:underline"
           >
-            요금제 자세히 보기
+            {t.viewPricing}
             <ExternalLink className="w-3.5 h-3.5" />
           </Link>
           <button
             onClick={closeUpgradeModal}
             className="w-full text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
           >
-            나중에 할게요
+            {t.later}
           </button>
         </div>
       </div>

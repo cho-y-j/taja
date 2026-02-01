@@ -48,13 +48,21 @@ export function getStarRating(accuracy: number): number {
   return 0;
 }
 
-// 별 개수에 따른 메시지 (항상 한국어)
-export function getStarMessage(stars: number): string {
-  const messages: Record<number, string> = {
-    0: '다시 도전해보세요!',
-    1: '잘했어요!',
-    2: '훌륭해요!',
-    3: '완벽해요!',
+// 별 개수에 따른 메시지
+export function getStarMessage(stars: number, lang: 'ko' | 'en' = 'ko'): string {
+  const messages: Record<'ko' | 'en', Record<number, string>> = {
+    ko: {
+      0: '다시 도전해보세요!',
+      1: '잘했어요!',
+      2: '훌륭해요!',
+      3: '완벽해요!',
+    },
+    en: {
+      0: 'Try again!',
+      1: 'Good job!',
+      2: 'Excellent!',
+      3: 'Perfect!',
+    },
   };
-  return messages[stars] || messages[0];
+  return messages[lang][stars] || messages[lang][0];
 }

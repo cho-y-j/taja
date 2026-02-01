@@ -14,16 +14,74 @@ import { rowLevels, rowNames, generateRowPracticeText, type KeyboardRow } from '
 import { koreanRowLevels, koreanRowNames, generateKoreanPracticeText, korToEngMap } from '@/lib/typing/korean-keyboard';
 import { useThemeStore } from '@/stores/theme-store';
 
+const uiContent = {
+  ko: {
+    pageTitle: '키보드 기본 연습',
+    switchToKo: '한글로 전환',
+    switchToEn: 'English',
+    enKeyboard: '🇺🇸 영문 자판',
+    koKeyboard: '🇰🇷 한글 자판',
+    selectRow: '연습할 행을 선택하세요',
+    selectRowDesc: '홈로우부터 시작해서 윗줄, 아랫줄 순서로 연습하는 것을 권장합니다',
+    levelPractice: '단계 연습',
+    startPractice: '연습 시작',
+    accuracy: '정확도',
+    time: '시간',
+    errors: '오류',
+    continue: '계속',
+    pause: '일시정지',
+    practiceKeys: '연습 키:',
+    target: '목표',
+    levelPassed: '레벨 통과!',
+    tryAgain: '다시 도전!',
+    nextLevel: '다음 레벨',
+    otherRow: '다른 행 연습',
+    restart: '다시 연습',
+    selectOther: '행 선택',
+    enterNext: 'Enter로 다음 레벨',
+    enterRetry: 'Enter로 다시 연습',
+    startTyping: '타이핑 시작...',
+  },
+  en: {
+    pageTitle: 'Keyboard Practice',
+    switchToKo: 'Switch to Korean',
+    switchToEn: 'English',
+    enKeyboard: '🇺🇸 English Keyboard',
+    koKeyboard: '🇰🇷 Korean Keyboard',
+    selectRow: 'Select a row to practice',
+    selectRowDesc: 'Start with home row, then top row and bottom row',
+    levelPractice: '-level practice',
+    startPractice: 'Start Practice',
+    accuracy: 'Accuracy',
+    time: 'Time',
+    errors: 'Errors',
+    continue: 'Resume',
+    pause: 'Pause',
+    practiceKeys: 'Keys:',
+    target: 'Target',
+    levelPassed: 'Level Passed!',
+    tryAgain: 'Try Again!',
+    nextLevel: 'Next Level',
+    otherRow: 'Other Rows',
+    restart: 'Restart',
+    selectOther: 'Select Row',
+    enterNext: 'Press Enter for next level',
+    enterRetry: 'Press Enter to retry',
+    startTyping: 'Start typing...',
+  },
+};
+
 type Language = 'en' | 'ko';
 
 export default function KeyboardPracticePage() {
   const router = useRouter();
-  const { language: storeLanguage, setLanguage: setStoreLanguage } = useThemeStore();
+  const { language: storeLanguage, setLanguage: setStoreLanguage, uiLanguage } = useThemeStore();
   const [language, setLanguage] = useState<Language>(storeLanguage || 'en');
   const [selectedRow, setSelectedRow] = useState<KeyboardRow>('home');
   const [currentLevel, setCurrentLevel] = useState(1);
   const [practiceText, setPracticeText] = useState('');
   const [showRowSelect, setShowRowSelect] = useState(true);
+  const t = uiContent[uiLanguage];
 
   const levels = language === 'en' ? rowLevels[selectedRow] : koreanRowLevels[selectedRow];
   const currentLevelData = levels[currentLevel - 1];
@@ -202,11 +260,11 @@ export default function KeyboardPracticePage() {
                     <ArrowLeft className="w-5 h-5" />
                   </Button>
                 </Link>
-                <h1 className="text-xl font-bold">키보드 기본 연습</h1>
+                <h1 className="text-xl font-bold">{t.pageTitle}</h1>
               </div>
               <Button variant="outline" size="sm" onClick={toggleLanguage}>
                 <Globe className="w-4 h-4 mr-2" />
-                {language === 'en' ? '한글로 전환' : 'English'}
+                {language === 'en' ? t.switchToKo : t.switchToEn}
               </Button>
             </div>
           </div>
@@ -215,11 +273,11 @@ export default function KeyboardPracticePage() {
         <main className="container mx-auto px-4 py-8 max-w-4xl">
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-full mb-4">
-              {language === 'en' ? '🇺🇸 영문 자판' : '🇰🇷 한글 자판'}
+              {language === 'en' ? t.enKeyboard : t.koKeyboard}
             </div>
-            <h2 className="text-2xl font-bold mb-2">연습할 행을 선택하세요</h2>
+            <h2 className="text-2xl font-bold mb-2">{t.selectRow}</h2>
             <p className="text-[var(--color-text-muted)]">
-              홈로우부터 시작해서 윗줄, 아랫줄 순서로 연습하는 것을 권장합니다
+              {t.selectRowDesc}
             </p>
           </div>
 
@@ -237,8 +295,8 @@ export default function KeyboardPracticePage() {
                   onClick={() => setSelectedRow(row)}
                 >
                   <CardHeader>
-                    <CardTitle>{typeof name === 'object' ? name.ko : name}</CardTitle>
-                    {typeof name === 'object' && <CardDescription>{name.en}</CardDescription>}
+                    <CardTitle>{typeof name === 'object' ? (uiLanguage === 'en' ? name.en : name.ko) : name}</CardTitle>
+                    {typeof name === 'object' && <CardDescription>{uiLanguage === 'en' ? name.ko : name.en}</CardDescription>}
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-wrap gap-1">
@@ -252,7 +310,7 @@ export default function KeyboardPracticePage() {
                       ))}
                     </div>
                     <p className="mt-3 text-sm text-[var(--color-text-muted)]">
-                      {rowLevelData.length}단계 연습
+                      {rowLevelData.length}{t.levelPractice}
                     </p>
                   </CardContent>
                 </Card>
@@ -264,8 +322,8 @@ export default function KeyboardPracticePage() {
             <Button size="lg" onClick={handleStart}>
               <Play className="w-5 h-5 mr-2" />
               {typeof currentRowNames[selectedRow] === 'object'
-                ? currentRowNames[selectedRow].ko
-                : currentRowNames[selectedRow]} 연습 시작
+                ? (uiLanguage === 'en' ? currentRowNames[selectedRow].en : currentRowNames[selectedRow].ko)
+                : currentRowNames[selectedRow]} {t.startPractice}
             </Button>
           </div>
         </main>
@@ -319,7 +377,7 @@ export default function KeyboardPracticePage() {
             </div>
             <div className="w-px h-4 bg-[var(--color-border)]" />
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-[var(--color-text-muted)]">정확도</span>
+              <span className="text-[11px] text-[var(--color-text-muted)]">{t.accuracy}</span>
               <span className={`text-sm font-bold ${
                 metrics.accuracy >= 90 ? 'text-[var(--color-success)]'
                   : metrics.accuracy >= 70 ? 'text-[var(--color-warning)]'
@@ -328,12 +386,12 @@ export default function KeyboardPracticePage() {
             </div>
             <div className="w-px h-4 bg-[var(--color-border)]" />
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-[var(--color-text-muted)]">시간</span>
+              <span className="text-[11px] text-[var(--color-text-muted)]">{t.time}</span>
               <span className="text-sm font-bold text-[var(--color-text)]">{formatTime(metrics.elapsedTime)}</span>
             </div>
             <div className="w-px h-4 bg-[var(--color-border)]" />
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-[var(--color-text-muted)]">오류</span>
+              <span className="text-[11px] text-[var(--color-text-muted)]">{t.errors}</span>
               <span className={`text-sm font-bold ${
                 metrics.errorCount === 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'
               }`}>{metrics.errorCount}</span>
@@ -345,7 +403,7 @@ export default function KeyboardPracticePage() {
                   onClick={isPaused ? resume : pause}
                   className="text-[11px] font-medium text-[var(--color-primary)] hover:underline"
                 >
-                  {isPaused ? '계속' : '일시정지'}
+                  {isPaused ? t.continue : t.pause}
                 </button>
               </>
             )}
@@ -372,13 +430,13 @@ export default function KeyboardPracticePage() {
       {/* ── Level info bar (thin) ── */}
       <div className="shrink-0 bg-[var(--color-surface)] border-b border-[var(--color-border)] px-4 py-1">
         <div className="max-w-6xl mx-auto flex items-center justify-between text-xs text-[var(--color-text-muted)]">
-          <span>{currentLevelData.descriptionKo}</span>
+          <span>{uiLanguage === 'en' ? currentLevelData.description : currentLevelData.descriptionKo}</span>
           <div className="flex items-center gap-3">
             <span>
-              연습 키: {currentLevelData.keys.map(k => k === ' ' ? '␣' : (language === 'en' ? k.toUpperCase() : k)).join(' ')}
+              {t.practiceKeys} {currentLevelData.keys.map(k => k === ' ' ? '␣' : (language === 'en' ? k.toUpperCase() : k)).join(' ')}
             </span>
             <span className="text-[var(--color-primary)] font-medium">
-              목표 {currentLevelData.targetAccuracy}%
+              {t.target} {currentLevelData.targetAccuracy}%
             </span>
           </div>
         </div>
@@ -420,7 +478,7 @@ export default function KeyboardPracticePage() {
             className="w-full p-3 text-lg border-2 border-[var(--color-border)] rounded-lg
                      focus:border-[var(--color-primary)] focus:outline-none
                      bg-[var(--color-surface)] font-mono"
-            placeholder={!isStarted ? (language === 'en' ? 'Start typing...' : '타이핑 시작...') : ''}
+            placeholder={!isStarted ? t.startTyping : ''}
             autoFocus
           />
 
@@ -431,38 +489,38 @@ export default function KeyboardPracticePage() {
                 {isPassed ? (
                   <>
                     <p className="text-base font-bold text-green-700 mb-1">
-                      레벨 {currentLevel} 통과!
+                      {uiLanguage === 'en' ? `Level ${currentLevel} Passed!` : `레벨 ${currentLevel} 통과!`}
                     </p>
                     <p className="text-sm text-green-600 mb-2">
-                      정확도 {metrics.accuracy}% (목표 {currentLevelData.targetAccuracy}%)
+                      {t.accuracy} {metrics.accuracy}% ({t.target} {currentLevelData.targetAccuracy}%)
                     </p>
                     <div className="flex justify-center gap-2">
-                      <Button variant="outline" size="sm" onClick={handleRestart}>다시 연습</Button>
+                      <Button variant="outline" size="sm" onClick={handleRestart}>{t.restart}</Button>
                       {currentLevel < levels.length ? (
                         <Button size="sm" onClick={handleNextLevel} className="bg-green-600 hover:bg-green-700">
-                          다음 레벨
+                          {t.nextLevel}
                         </Button>
                       ) : (
                         <Button size="sm" onClick={handleBackToSelect} className="bg-green-600 hover:bg-green-700">
-                          다른 행 연습
+                          {t.otherRow}
                         </Button>
                       )}
                     </div>
-                    <p className="text-[11px] text-green-500 mt-1">Enter로 {currentLevel < levels.length ? '다음 레벨' : '다시 연습'}</p>
+                    <p className="text-[11px] text-green-500 mt-1">{currentLevel < levels.length ? t.enterNext : t.enterRetry}</p>
                   </>
                 ) : (
                   <>
-                    <p className="text-base font-bold text-orange-700 mb-1">다시 도전!</p>
+                    <p className="text-base font-bold text-orange-700 mb-1">{t.tryAgain}</p>
                     <p className="text-sm text-orange-600 mb-2">
-                      정확도 {metrics.accuracy}% (목표 {currentLevelData.targetAccuracy}%)
+                      {t.accuracy} {metrics.accuracy}% ({t.target} {currentLevelData.targetAccuracy}%)
                     </p>
                     <div className="flex justify-center gap-2">
                       <Button size="sm" onClick={handleRestart} className="bg-orange-600 hover:bg-orange-700">
-                        다시 연습
+                        {t.restart}
                       </Button>
-                      <Button variant="outline" size="sm" onClick={handleBackToSelect}>행 선택</Button>
+                      <Button variant="outline" size="sm" onClick={handleBackToSelect}>{t.selectOther}</Button>
                     </div>
-                    <p className="text-[11px] text-orange-500 mt-1">Enter로 다시 연습</p>
+                    <p className="text-[11px] text-orange-500 mt-1">{t.enterRetry}</p>
                   </>
                 )}
               </div>

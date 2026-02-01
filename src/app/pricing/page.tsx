@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCreditStore } from '@/stores/credit-store';
+import { useThemeStore } from '@/stores/theme-store';
 
 // Clerk 설정 여부 확인
 const CLERK_CONFIGURED =
@@ -23,10 +24,119 @@ const CLERK_CONFIGURED =
   !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.includes('여기에') &&
   process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.startsWith('pk_');
 
+const content = {
+  ko: {
+    pageTitle: '요금제',
+    currentStatus: '현재 상태',
+    subscribedUnlimited: '구독 중 (무제한)',
+    creditsHeld: '크레딧 보유',
+    heroTitle: 'AI 기능으로 학습 효과 UP!',
+    heroDesc: 'AI가 생성하는 맞춤형 학습 콘텐츠로 타자 연습의 효과를 극대화하세요. 번역, 요약, 문서 생성 등 다양한 AI 기능을 이용할 수 있습니다.',
+    aiFeatures: '포함된 AI 기능',
+    aiTranslate: 'AI 번역',
+    aiTranslateDesc: '영한/한영 번역',
+    aiDocument: 'AI 문서 생성',
+    aiDocumentDesc: '주제별 학습 콘텐츠',
+    urlExtract: 'URL 추출',
+    urlExtractDesc: '웹/유튜브 콘텐츠',
+    aiSummary: 'AI 요약',
+    aiSummaryDesc: '문서 요약',
+    monthlyPlan: '월간 구독',
+    monthlyPlanDesc: '부담 없이 시작하세요',
+    price: '1,000',
+    priceUnit: '원/월',
+    coffeePrice: '커피 한 잔 값으로 무제한 AI!',
+    unlimitedAI: 'AI 기능 무제한 사용',
+    allContent: '모든 학습 콘텐츠 이용',
+    noWorry: '크레딧 걱정 없이 연습',
+    cancelAnytime: '언제든지 해지 가능',
+    subscribed: '구독 중',
+    startSubscription: '구독 시작하기',
+    loginAndSubscribe: '로그인하고 구독하기',
+    creditPack: '크레딧 충전',
+    creditPackDesc: '필요한 만큼만 구매',
+    creditInfo: '구독 없이 필요할 때만 충전해서 사용하세요.',
+    creditInfo2: '1 크레딧 = 약 10,000 토큰 (AI 요청 1~3회)',
+    credits: '크레딧',
+    popular: '인기',
+    loginRequired: '로그인 후 구매할 수 있습니다',
+    newUser: '처음이신가요?',
+    freeCredits: '회원가입만 하면',
+    freeCreditsAmount: '200 크레딧',
+    freeCreditsDesc: '을 무료로 드려요!',
+    freeCreditsDesc2: '결제 없이 AI 기능을 체험해보세요.',
+    startFree: '무료로 시작하기',
+    faq: '자주 묻는 질문',
+    faq1Q: 'Q. 크레딧은 언제 소진되나요?',
+    faq1A: 'AI 번역, 문서 생성, URL 콘텐츠 추출 등 AI 기능을 사용할 때마다 크레딧이 차감됩니다. 기본 타자 연습은 크레딧 없이 무료입니다.',
+    faq2Q: 'Q. 구독을 해지하면 어떻게 되나요?',
+    faq2A: '구독 기간이 끝날 때까지 무제한으로 이용 가능합니다. 기간 종료 후에는 보유 크레딧만큼 사용할 수 있습니다.',
+    faq3Q: 'Q. 크레딧은 유효기간이 있나요?',
+    faq3A: '아니요, 크레딧은 유효기간 없이 평생 사용 가능합니다.',
+    paymentSoon: '결제 기능은 곧 오픈 예정입니다!',
+  },
+  en: {
+    pageTitle: 'Pricing',
+    currentStatus: 'Current Status',
+    subscribedUnlimited: 'Subscribed (Unlimited)',
+    creditsHeld: 'credits',
+    heroTitle: 'Boost Your Learning with AI!',
+    heroDesc: 'Maximize your typing practice with AI-generated personalized content. Access translation, summarization, document generation, and more.',
+    aiFeatures: 'Included AI Features',
+    aiTranslate: 'AI Translation',
+    aiTranslateDesc: 'EN↔KO translation',
+    aiDocument: 'AI Documents',
+    aiDocumentDesc: 'Topic-based content',
+    urlExtract: 'URL Extract',
+    urlExtractDesc: 'Web/YouTube content',
+    aiSummary: 'AI Summary',
+    aiSummaryDesc: 'Document summarization',
+    monthlyPlan: 'Monthly Plan',
+    monthlyPlanDesc: 'Start with no pressure',
+    price: '$1',
+    priceUnit: '/month',
+    coffeePrice: 'Less than a coffee for unlimited AI!',
+    unlimitedAI: 'Unlimited AI features',
+    allContent: 'Access all learning content',
+    noWorry: 'No credit worries',
+    cancelAnytime: 'Cancel anytime',
+    subscribed: 'Subscribed',
+    startSubscription: 'Start Subscription',
+    loginAndSubscribe: 'Sign in to Subscribe',
+    creditPack: 'Buy Credits',
+    creditPackDesc: 'Pay as you go',
+    creditInfo: 'Only charge when you need it.',
+    creditInfo2: '1 credit ≈ 10,000 tokens (1-3 AI requests)',
+    credits: 'credits',
+    popular: 'Popular',
+    loginRequired: 'Sign in to purchase',
+    newUser: 'New here?',
+    freeCredits: 'Sign up and get',
+    freeCreditsAmount: '200 credits',
+    freeCreditsDesc: ' for free!',
+    freeCreditsDesc2: 'Try AI features without payment.',
+    startFree: 'Start for Free',
+    faq: 'FAQ',
+    faq1Q: 'Q. When are credits used?',
+    faq1A: 'Credits are used for AI translation, document generation, URL extraction, etc. Basic typing practice is free without credits.',
+    faq2Q: 'Q. What happens if I cancel?',
+    faq2A: 'You can use unlimited features until your subscription ends. After that, you can use your remaining credits.',
+    faq3Q: 'Q. Do credits expire?',
+    faq3A: 'No, credits never expire.',
+    paymentSoon: 'Payment feature coming soon!',
+  },
+};
+
 export default function PricingPage() {
   const { balance, hasSubscription, fetchCredits } = useCreditStore();
+  const { uiLanguage } = useThemeStore();
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // 로그인 상태 확인
   useEffect(() => {
@@ -61,12 +171,15 @@ export default function PricingPage() {
     return () => clearInterval(interval);
   }, [fetchCredits]);
 
+  const lang = mounted ? uiLanguage : 'ko';
+  const t = content[lang];
+
   const handleSubscribe = () => {
     if (!isSignedIn) {
       window.location.href = '/sign-in?redirect_url=/pricing';
       return;
     }
-    alert('결제 기능은 곧 오픈 예정입니다!');
+    alert(t.paymentSoon);
   };
 
   const handleBuyCredits = (amount: number) => {
@@ -74,7 +187,7 @@ export default function PricingPage() {
       window.location.href = '/sign-in?redirect_url=/pricing';
       return;
     }
-    alert('결제 기능은 곧 오픈 예정입니다!');
+    alert(t.paymentSoon);
   };
 
   return (
@@ -86,7 +199,7 @@ export default function PricingPage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <h1 className="text-xl font-bold text-[var(--color-text)]">
-            요금제
+            {t.pageTitle}
           </h1>
         </div>
       </header>
@@ -105,12 +218,12 @@ export default function PricingPage() {
                 )}
                 <div>
                   <p className="text-sm text-[var(--color-text-muted)]">
-                    현재 상태
+                    {t.currentStatus}
                   </p>
                   <p className="font-bold text-[var(--color-text)]">
                     {hasSubscription
-                      ? '구독 중 (무제한)'
-                      : `${balance} 크레딧 보유`}
+                      ? t.subscribedUnlimited
+                      : `${balance} ${t.creditsHeld}`}
                   </p>
                 </div>
               </div>
@@ -121,46 +234,45 @@ export default function PricingPage() {
         {/* 히어로 섹션 */}
         <section className="text-center mb-12 animate-fade-in">
           <h2 className="text-3xl font-bold text-[var(--color-text)] mb-4">
-            AI 기능으로 학습 효과 UP!
+            {t.heroTitle}
           </h2>
           <p className="text-[var(--color-text-muted)] max-w-xl mx-auto">
-            AI가 생성하는 맞춤형 학습 콘텐츠로 타자 연습의 효과를 극대화하세요.
-            번역, 요약, 문서 생성 등 다양한 AI 기능을 이용할 수 있습니다.
+            {t.heroDesc}
           </p>
         </section>
 
         {/* AI 기능 소개 */}
         <section className="mb-12 animate-slide-up" style={{ animationDelay: '0.1s' }}>
           <h3 className="text-lg font-bold text-[var(--color-text)] mb-4 text-center">
-            포함된 AI 기능
+            {t.aiFeatures}
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="card p-4 text-center">
               <MessageSquare className="w-8 h-8 mx-auto mb-2 text-[var(--color-primary)]" />
-              <p className="font-medium text-[var(--color-text)]">AI 번역</p>
+              <p className="font-medium text-[var(--color-text)]">{t.aiTranslate}</p>
               <p className="text-xs text-[var(--color-text-muted)]">
-                영한/한영 번역
+                {t.aiTranslateDesc}
               </p>
             </div>
             <div className="card p-4 text-center">
               <FileText className="w-8 h-8 mx-auto mb-2 text-[var(--color-secondary)]" />
-              <p className="font-medium text-[var(--color-text)]">AI 문서 생성</p>
+              <p className="font-medium text-[var(--color-text)]">{t.aiDocument}</p>
               <p className="text-xs text-[var(--color-text-muted)]">
-                주제별 학습 콘텐츠
+                {t.aiDocumentDesc}
               </p>
             </div>
             <div className="card p-4 text-center">
               <Link2 className="w-8 h-8 mx-auto mb-2 text-[var(--color-success)]" />
-              <p className="font-medium text-[var(--color-text)]">URL 추출</p>
+              <p className="font-medium text-[var(--color-text)]">{t.urlExtract}</p>
               <p className="text-xs text-[var(--color-text-muted)]">
-                웹/유튜브 콘텐츠
+                {t.urlExtractDesc}
               </p>
             </div>
             <div className="card p-4 text-center">
               <BookOpen className="w-8 h-8 mx-auto mb-2 text-[var(--color-warning)]" />
-              <p className="font-medium text-[var(--color-text)]">AI 요약</p>
+              <p className="font-medium text-[var(--color-text)]">{t.aiSummary}</p>
               <p className="text-xs text-[var(--color-text-muted)]">
-                문서 요약
+                {t.aiSummaryDesc}
               </p>
             </div>
           </div>
@@ -186,10 +298,10 @@ export default function PricingPage() {
               </div>
               <div>
                 <h3 className="text-xl font-bold text-[var(--color-text)]">
-                  월간 구독
+                  {t.monthlyPlan}
                 </h3>
                 <p className="text-sm text-[var(--color-text-muted)]">
-                  부담 없이 시작하세요
+                  {t.monthlyPlanDesc}
                 </p>
               </div>
             </div>
@@ -197,33 +309,33 @@ export default function PricingPage() {
             <div className="mb-6">
               <div className="flex items-end gap-1 mb-1">
                 <span className="text-4xl font-bold text-[var(--color-text)]">
-                  1,000
+                  {t.price}
                 </span>
                 <span className="text-lg text-[var(--color-text-muted)] mb-1">
-                  원/월
+                  {t.priceUnit}
                 </span>
               </div>
               <p className="text-sm text-[var(--color-text-muted)]">
-                커피 한 잔 값으로 무제한 AI!
+                {t.coffeePrice}
               </p>
             </div>
 
             <ul className="space-y-3 mb-6">
               <li className="flex items-center gap-2 text-[var(--color-text)]">
                 <Check className="w-5 h-5 text-[var(--color-success)]" />
-                AI 기능 무제한 사용
+                {t.unlimitedAI}
               </li>
               <li className="flex items-center gap-2 text-[var(--color-text)]">
                 <Check className="w-5 h-5 text-[var(--color-success)]" />
-                모든 학습 콘텐츠 이용
+                {t.allContent}
               </li>
               <li className="flex items-center gap-2 text-[var(--color-text)]">
                 <Check className="w-5 h-5 text-[var(--color-success)]" />
-                크레딧 걱정 없이 연습
+                {t.noWorry}
               </li>
               <li className="flex items-center gap-2 text-[var(--color-text)]">
                 <Check className="w-5 h-5 text-[var(--color-success)]" />
-                언제든지 해지 가능
+                {t.cancelAnytime}
               </li>
             </ul>
 
@@ -234,14 +346,14 @@ export default function PricingPage() {
               disabled={hasSubscription}
             >
               {hasSubscription ? (
-                '구독 중'
+                t.subscribed
               ) : isSignedIn ? (
                 <>
                   <Zap className="w-4 h-4 mr-2" />
-                  구독 시작하기
+                  {t.startSubscription}
                 </>
               ) : (
-                '로그인하고 구독하기'
+                t.loginAndSubscribe
               )}
             </Button>
           </div>
@@ -260,24 +372,24 @@ export default function PricingPage() {
               </div>
               <div>
                 <h3 className="text-xl font-bold text-[var(--color-text)]">
-                  크레딧 충전
+                  {t.creditPack}
                 </h3>
                 <p className="text-sm text-[var(--color-text-muted)]">
-                  필요한 만큼만 구매
+                  {t.creditPackDesc}
                 </p>
               </div>
             </div>
 
             <p className="text-sm text-[var(--color-text-muted)] mb-6">
-              구독 없이 필요할 때만 충전해서 사용하세요.
-              <br />1 크레딧 = 약 10,000 토큰 (AI 요청 1~3회)
+              {t.creditInfo}
+              <br />{t.creditInfo2}
             </p>
 
             <div className="space-y-3 mb-6">
               {[
-                { amount: 100, price: 500, popular: false },
-                { amount: 500, price: 2000, popular: true },
-                { amount: 1000, price: 3500, popular: false },
+                { amount: 100, price: lang === 'ko' ? '500원' : '$0.50', popular: false },
+                { amount: 500, price: lang === 'ko' ? '2,000원' : '$2', popular: true },
+                { amount: 1000, price: lang === 'ko' ? '3,500원' : '$3.50', popular: false },
               ].map((pack) => (
                 <button
                   key={pack.amount}
@@ -294,17 +406,17 @@ export default function PricingPage() {
                     </div>
                     <div className="text-left">
                       <p className="font-bold text-[var(--color-text)]">
-                        {pack.amount} 크레딧
+                        {pack.amount} {t.credits}
                       </p>
                       {pack.popular && (
                         <span className="text-xs text-[var(--color-secondary)] font-medium">
-                          인기
+                          {t.popular}
                         </span>
                       )}
                     </div>
                   </div>
                   <p className="font-bold text-[var(--color-text)]">
-                    {pack.price.toLocaleString()}원
+                    {pack.price}
                   </p>
                 </button>
               ))}
@@ -312,7 +424,7 @@ export default function PricingPage() {
 
             {!isSignedIn && (
               <p className="text-xs text-center text-[var(--color-text-muted)]">
-                로그인 후 구매할 수 있습니다
+                {t.loginRequired}
               </p>
             )}
           </div>
@@ -325,17 +437,17 @@ export default function PricingPage() {
         >
           <Sparkles className="w-10 h-10 mx-auto mb-3 text-[var(--color-primary)]" />
           <h3 className="text-lg font-bold text-[var(--color-text)] mb-2">
-            처음이신가요?
+            {t.newUser}
           </h3>
           <p className="text-[var(--color-text-muted)] mb-4">
-            회원가입만 하면 <strong>200 크레딧</strong>을 무료로 드려요!
+            {t.freeCredits} <strong>{t.freeCreditsAmount}</strong>{t.freeCreditsDesc}
             <br />
-            결제 없이 AI 기능을 체험해보세요.
+            {t.freeCreditsDesc2}
           </p>
           {!isSignedIn && (
             <Link href="/sign-up">
               <Button variant="outline" size="lg">
-                무료로 시작하기
+                {t.startFree}
               </Button>
             </Link>
           )}
@@ -344,33 +456,31 @@ export default function PricingPage() {
         {/* FAQ */}
         <section className="mt-12 animate-fade-in" style={{ animationDelay: '0.5s' }}>
           <h3 className="text-lg font-bold text-[var(--color-text)] mb-6 text-center">
-            자주 묻는 질문
+            {t.faq}
           </h3>
           <div className="space-y-4">
             <div className="card p-4">
               <p className="font-medium text-[var(--color-text)] mb-2">
-                Q. 크레딧은 언제 소진되나요?
+                {t.faq1Q}
               </p>
               <p className="text-sm text-[var(--color-text-muted)]">
-                AI 번역, 문서 생성, URL 콘텐츠 추출 등 AI 기능을 사용할 때마다
-                크레딧이 차감됩니다. 기본 타자 연습은 크레딧 없이 무료입니다.
+                {t.faq1A}
               </p>
             </div>
             <div className="card p-4">
               <p className="font-medium text-[var(--color-text)] mb-2">
-                Q. 구독을 해지하면 어떻게 되나요?
+                {t.faq2Q}
               </p>
               <p className="text-sm text-[var(--color-text-muted)]">
-                구독 기간이 끝날 때까지 무제한으로 이용 가능합니다. 기간 종료 후에는
-                보유 크레딧만큼 사용할 수 있습니다.
+                {t.faq2A}
               </p>
             </div>
             <div className="card p-4">
               <p className="font-medium text-[var(--color-text)] mb-2">
-                Q. 크레딧은 유효기간이 있나요?
+                {t.faq3Q}
               </p>
               <p className="text-sm text-[var(--color-text-muted)]">
-                아니요, 크레딧은 유효기간 없이 평생 사용 가능합니다.
+                {t.faq3A}
               </p>
             </div>
           </div>

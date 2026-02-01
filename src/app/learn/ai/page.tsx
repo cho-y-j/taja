@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -17,10 +17,60 @@ import { useThemeStore } from '@/stores/theme-store';
 import { useDocumentStore } from '@/stores/document-store';
 import { CreditBalance, UpgradeModal } from '@/components/credits';
 
+const content = {
+  ko: {
+    pageTitle: 'AI 학습',
+    documentsCount: '개의 문서',
+    newDocument: '새 문서 만들기',
+    directInput: '직접 입력',
+    directInputDesc: '텍스트를 직접 입력해요',
+    fileUpload: '파일 업로드',
+    fileUploadDesc: 'PDF, TXT 파일',
+    aiGenerate: 'AI 생성',
+    aiGenerateDesc: 'AI가 콘텐츠를 만들어요',
+    urlExtract: 'URL 추출',
+    urlExtractDesc: '웹/유튜브에서 추출',
+    myDocuments: '내 문서',
+    viewAll: '전체 보기',
+    noDocuments: '아직 문서가 없어요',
+    createFirst: '첫 문서 만들기',
+    moreCount: '개 더 보기',
+    korean: '한글',
+    english: '영문',
+    chars: '자',
+  },
+  en: {
+    pageTitle: 'AI Learning',
+    documentsCount: ' documents',
+    newDocument: 'Create New Document',
+    directInput: 'Type Text',
+    directInputDesc: 'Enter text directly',
+    fileUpload: 'Upload File',
+    fileUploadDesc: 'PDF, TXT files',
+    aiGenerate: 'AI Generate',
+    aiGenerateDesc: 'AI creates content for you',
+    urlExtract: 'URL Extract',
+    urlExtractDesc: 'Extract from web/YouTube',
+    myDocuments: 'My Documents',
+    viewAll: 'View All',
+    noDocuments: 'No documents yet',
+    createFirst: 'Create First Document',
+    moreCount: ' more',
+    korean: 'Korean',
+    english: 'English',
+    chars: ' chars',
+  },
+};
+
 export default function AILearningPage() {
   const router = useRouter();
-  const { language } = useThemeStore();
+  const { language, uiLanguage } = useThemeStore();
   const { documents, setViewMode, startCreate } = useDocumentStore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // 언어가 선택되지 않았다면 홈으로 리다이렉트
   useEffect(() => {
@@ -48,7 +98,9 @@ export default function AILearningPage() {
     );
   }
 
-  const languageLabel = language === 'ko' ? '한글' : '영문';
+  const lang = mounted ? uiLanguage : 'ko';
+  const t = content[lang];
+  const languageLabel = language === 'ko' ? t.korean : t.english;
 
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
@@ -63,10 +115,10 @@ export default function AILearningPage() {
           </Link>
           <div className="flex-1">
             <h1 className="text-lg font-bold text-[var(--color-text)]">
-              AI 학습 ({languageLabel})
+              {t.pageTitle} ({languageLabel})
             </h1>
             <p className="text-xs text-[var(--color-text-muted)]">
-              {documents.length}개의 문서
+              {documents.length}{t.documentsCount}
             </p>
           </div>
           <CreditBalance />
@@ -78,7 +130,7 @@ export default function AILearningPage() {
         {/* 새 문서 만들기 */}
         <section className="mb-8">
           <h2 className="text-lg font-bold text-[var(--color-text)] mb-4">
-            새 문서 만들기
+            {t.newDocument}
           </h2>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -92,10 +144,10 @@ export default function AILearningPage() {
                 <FileText className="w-6 h-6 text-white" />
               </div>
               <h3 className="font-bold text-[var(--color-text)] mb-1">
-                직접 입력
+                {t.directInput}
               </h3>
               <p className="text-xs text-[var(--color-text-muted)]">
-                텍스트를 직접 입력해요
+                {t.directInputDesc}
               </p>
             </button>
 
@@ -109,10 +161,10 @@ export default function AILearningPage() {
                 <Upload className="w-6 h-6 text-white" />
               </div>
               <h3 className="font-bold text-[var(--color-text)] mb-1">
-                파일 업로드
+                {t.fileUpload}
               </h3>
               <p className="text-xs text-[var(--color-text-muted)]">
-                PDF, TXT 파일
+                {t.fileUploadDesc}
               </p>
             </button>
 
@@ -126,10 +178,10 @@ export default function AILearningPage() {
                 <Sparkles className="w-6 h-6 text-white" />
               </div>
               <h3 className="font-bold text-[var(--color-text)] mb-1">
-                AI 생성
+                {t.aiGenerate}
               </h3>
               <p className="text-xs text-[var(--color-text-muted)]">
-                AI가 콘텐츠를 만들어요
+                {t.aiGenerateDesc}
               </p>
             </button>
 
@@ -143,10 +195,10 @@ export default function AILearningPage() {
                 <Link2 className="w-6 h-6 text-white" />
               </div>
               <h3 className="font-bold text-[var(--color-text)] mb-1">
-                URL 추출
+                {t.urlExtract}
               </h3>
               <p className="text-xs text-[var(--color-text-muted)]">
-                웹/유튜브에서 추출
+                {t.urlExtractDesc}
               </p>
             </button>
           </div>
@@ -156,14 +208,14 @@ export default function AILearningPage() {
         <section className="animate-fade-in" style={{ animationDelay: '0.3s' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-[var(--color-text)]">
-              내 문서
+              {t.myDocuments}
             </h2>
             {documents.length > 0 && (
               <button
                 onClick={handleOpenDocuments}
                 className="text-sm text-[var(--color-primary)] font-medium hover:underline"
               >
-                전체 보기
+                {t.viewAll}
               </button>
             )}
           </div>
@@ -172,14 +224,14 @@ export default function AILearningPage() {
             <div className="card p-8 text-center">
               <Folder className="w-12 h-12 mx-auto mb-4 text-[var(--color-text-light)]" />
               <p className="text-[var(--color-text-muted)] mb-4">
-                아직 문서가 없어요
+                {t.noDocuments}
               </p>
               <button
                 onClick={() => handleCreateNew('input')}
                 className="btn btn-primary"
               >
                 <Plus className="w-4 h-4" />
-                첫 문서 만들기
+                {t.createFirst}
               </button>
             </div>
           ) : (
@@ -200,7 +252,7 @@ export default function AILearningPage() {
                           {doc.name}
                         </h3>
                         <p className="text-xs text-[var(--color-text-muted)]">
-                          {doc.content.length}자 · {doc.language === 'ko' ? '한글' : '영문'}
+                          {doc.content.length}{t.chars} · {doc.language === 'ko' ? t.korean : t.english}
                         </p>
                       </div>
                       <ChevronRight className="w-5 h-5 text-[var(--color-text-light)] flex-shrink-0" />
@@ -214,7 +266,7 @@ export default function AILearningPage() {
                   onClick={handleOpenDocuments}
                   className="w-full py-3 text-center text-sm text-[var(--color-primary)] font-medium hover:underline"
                 >
-                  +{documents.length - 5}개 더 보기
+                  +{documents.length - 5}{t.moreCount}
                 </button>
               )}
             </div>

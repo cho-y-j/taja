@@ -4,11 +4,23 @@ import { useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { Coins, Infinity as InfinityIcon, Sparkles } from 'lucide-react';
 import { useCreditStore } from '@/stores/credit-store';
+import { useThemeStore } from '@/stores/theme-store';
+
+const content = {
+  ko: {
+    subscribed: '구독 중',
+  },
+  en: {
+    subscribed: 'Subscribed',
+  },
+};
 
 export function CreditBalance() {
   const { isSignedIn, isLoaded } = useAuth();
   const { balance, hasSubscription, isLoading, lastFetched, fetchCredits, openUpgradeModal } =
     useCreditStore();
+  const { uiLanguage } = useThemeStore();
+  const t = content[uiLanguage];
 
   // 로그인 상태가 확인되면 크레딧 조회 (store가 자체 캐시 관리)
   useEffect(() => {
@@ -45,7 +57,7 @@ export function CreditBalance() {
         className="flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-[var(--color-secondary)] to-[var(--color-primary)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
       >
         <InfinityIcon className="w-4 h-4" />
-        <span className="hidden sm:inline">구독 중</span>
+        <span className="hidden sm:inline">{t.subscribed}</span>
       </button>
     );
   }
