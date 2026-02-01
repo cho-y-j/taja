@@ -85,16 +85,19 @@ export function DocumentListView() {
                   e.stopPropagation();
                   if (confirm('이 문서를 삭제하시겠습니까?')) {
                     deleteDocument(doc.id);
-                    // DB에서도 삭제 (로그인된 경우)
-                    try {
-                      const clerk = (window as unknown as { Clerk?: { session?: unknown } }).Clerk;
-                      if (clerk?.session) {
-                        await fetch(`/api/user/documents?id=${doc.id}`, {
-                          method: 'DELETE',
-                        });
+                    // DB에서도 삭제 (로그인된 경우, UUID 형식인 경우만)
+                    // 로컬 ID(doc-...)는 DB에 없으므로 스킵
+                    if (!doc.id.startsWith('doc-')) {
+                      try {
+                        const clerk = (window as unknown as { Clerk?: { session?: unknown } }).Clerk;
+                        if (clerk?.session) {
+                          await fetch(`/api/user/documents?id=${doc.id}`, {
+                            method: 'DELETE',
+                          });
+                        }
+                      } catch (e) {
+                        // 404는 무시 (이미 삭제됨)
                       }
-                    } catch (e) {
-                      console.error('DB 삭제 실패:', e);
                     }
                   }
                 }}
