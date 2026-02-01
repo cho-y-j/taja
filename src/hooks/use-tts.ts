@@ -256,6 +256,11 @@ export function useTTS(options: UseTTSOptions = {}) {
 
         window.speechSynthesis.speak(newUtterance);
         console.log('[TTS] Retry result - pending:', window.speechSynthesis.pending, 'speaking:', window.speechSynthesis.speaking);
+
+        // 재시도도 실패하면 Chrome 문제
+        if (!window.speechSynthesis.pending && window.speechSynthesis.speaking) {
+          console.error('[TTS] ⚠️ Chrome speechSynthesis is stuck. Solutions: 1) Restart Chrome completely (quit all windows), 2) Use Safari browser');
+        }
       }, 200);
     }
 
