@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@clerk/nextjs';
 import {
   Keyboard,
   Sparkles,
@@ -14,13 +13,9 @@ import {
   Check,
   ChevronDown,
   Zap,
-  Target,
-  TrendingUp,
-  Star,
 } from 'lucide-react';
 
 export default function LandingPage() {
-  const { isSignedIn } = useAuth();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -110,29 +105,18 @@ export default function LandingPage() {
             >
               요금제
             </Link>
-            {isSignedIn ? (
-              <Link
-                href="/learn"
-                className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
-              >
-                연습하기
-              </Link>
-            ) : (
-              <>
-                <Link
-                  href="/sign-in"
-                  className="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
-                >
-                  로그인
-                </Link>
-                <Link
-                  href="/sign-up"
-                  className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
-                >
-                  무료로 시작
-                </Link>
-              </>
-            )}
+            <Link
+              href="/sign-in"
+              className="text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
+            >
+              로그인
+            </Link>
+            <Link
+              href="/learn"
+              className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
+            >
+              시작하기
+            </Link>
           </div>
         </div>
       </nav>
