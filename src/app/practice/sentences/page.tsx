@@ -22,9 +22,7 @@ import {
   getSentencesByCategory,
   type PracticeSentence,
 } from '@/lib/typing/sentence-practice';
-import { PracticeResult } from '@/components/practice';
-import { PracticeMetrics } from '@/components/practice';
-import { PracticeControls } from '@/components/practice';
+import { PracticeResult, PracticeMetrics, PracticeControls, TimeSelector } from '@/components/practice';
 
 type ViewMode = 'category' | 'time' | 'practice' | 'result';
 
@@ -431,13 +429,6 @@ export default function SentencePracticePage() {
 
   // 시간 선택 화면
   if (viewMode === 'time') {
-    const timeOptions = [
-      { seconds: 60, label: '1분' },
-      { seconds: 180, label: '3분' },
-      { seconds: 300, label: '5분' },
-      { seconds: 600, label: '10분' },
-    ];
-
     const selectedCategoryName = sentenceCategories.find(
       (c) => c.id === selectedCategory
     )?.nameKo;
@@ -451,7 +442,12 @@ export default function SentencePracticePage() {
                 <Button variant="ghost" size="icon" onClick={() => setViewMode('category')}>
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
-                <h1 className="text-xl font-bold">연습 시간 선택</h1>
+                <div>
+                  <h1 className="text-xl font-bold">문장 연습</h1>
+                  <p className="text-sm text-[var(--color-text-muted)]">
+                    {selectedCategoryName}
+                  </p>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <SettingsDropdown />
@@ -462,31 +458,13 @@ export default function SentencePracticePage() {
         </header>
 
         <main className="container mx-auto px-4 py-8 max-w-2xl">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-primary-light)] rounded-full mb-4">
-              <Target className="w-4 h-4" />
-              {selectedCategoryName}
-            </div>
-            <h2 className="text-2xl font-bold mb-2">얼마나 연습할까요?</h2>
-            <p className="text-[var(--color-text-muted)]">
-              시간이 끝나면 평균 타수와 정확도를 보여드려요
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {timeOptions.map(({ seconds, label }) => (
-              <Card
-                key={seconds}
-                className="cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02]"
-                onClick={() => handleTimeSelect(seconds)}
-              >
-                <CardContent className="py-8 text-center">
-                  <Clock className="w-8 h-8 mx-auto mb-2 text-[var(--color-primary)]" />
-                  <p className="text-2xl font-bold">{label}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <TimeSelector
+            presets={[60, 180, 300]}
+            onSelect={handleTimeSelect}
+            itemCount={sentences.length}
+            itemLabel="문장"
+            customEnabled
+          />
         </main>
       </div>
     );
