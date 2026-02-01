@@ -215,20 +215,12 @@ export function DocumentCreateView() {
       setStructuredContent(null);
       selectDocument(editingDocumentId);
     } else {
-      const doc = addDocument({
-        name: draftName,
-        content: draftContent,
-        language: draftLanguage,
-        source: createSource || 'manual',
-        aiPrompt: createSource === 'ai' ? aiPrompt : undefined,
-        structured: structuredContent || undefined,
-      });
-
-      // DB에도 저장 (로그인된 경우)
+      // 먼저 DB에 저장 시도 (로그인된 경우) - DB ID를 사용
+      let dbDocId: string | null = null;
       try {
         const clerk = (window as unknown as { Clerk?: { session?: unknown } }).Clerk;
         if (clerk?.session) {
-          await fetch('/api/user/documents', {
+          const res = await fetch('/api/user/documents', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -239,10 +231,24 @@ export function DocumentCreateView() {
               structured: structuredContent || undefined,
             }),
           });
+          if (res.ok) {
+            const data = await res.json();
+            dbDocId = data.document?.id || null;
+          }
         }
       } catch (e) {
         console.error('DB 저장 실패:', e);
       }
+
+      // 로컬에 저장 (DB ID가 있으면 사용, 없으면 자동 생성)
+      const doc = addDocument({
+        name: draftName,
+        content: draftContent,
+        language: draftLanguage,
+        source: createSource || 'manual',
+        aiPrompt: createSource === 'ai' ? aiPrompt : undefined,
+        structured: structuredContent || undefined,
+      }, dbDocId || undefined);
 
       clearDraft();
       setStructuredContent(null);

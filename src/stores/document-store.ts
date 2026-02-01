@@ -91,7 +91,8 @@ interface DocumentActions {
   selectPracticeMode: (mode: PracticeMode) => void;
 
   addDocument: (
-    doc: Omit<UserDocument, 'id' | 'createdAt' | 'updatedAt'>
+    doc: Omit<UserDocument, 'id' | 'createdAt' | 'updatedAt'>,
+    useId?: string  // DB에서 생성된 ID 사용
   ) => UserDocument;
   updateDocument: (id: string, updates: Partial<UserDocument>) => void;
   deleteDocument: (id: string) => void;
@@ -196,11 +197,11 @@ export const useDocumentStore = create<DocumentState & DocumentActions>()(
       selectPracticeMode: (mode) =>
         set({ selectedPracticeMode: mode, viewMode: 'practice', currentPracticeIndex: 0 }),
 
-      addDocument: (doc) => {
+      addDocument: (doc, useId) => {
         const now = new Date().toISOString();
         const newDoc: UserDocument = {
           ...doc,
-          id: `doc-${Date.now()}`,
+          id: useId || `doc-${Date.now()}`,  // DB ID가 있으면 사용
           createdAt: now,
           updatedAt: now,
         };
