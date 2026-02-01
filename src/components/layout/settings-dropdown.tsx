@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Settings, Volume2, VolumeX, Keyboard, Mic, Play } from 'lucide-react';
+import { Settings, Volume2, VolumeX, Keyboard, Mic, Play, Eye } from 'lucide-react';
 import { useSettingsStore, VoiceGender, TTSSpeed } from '@/stores/settings-store';
+import { useThemeStore } from '@/stores/theme-store';
 import { useTTS } from '@/hooks/use-tts';
 
 export function SettingsDropdown() {
@@ -21,6 +22,8 @@ export function SettingsDropdown() {
     setTTSSpeed,
     setTTSVolume,
   } = useSettingsStore();
+
+  const { mode, setMode } = useThemeStore();
 
   const { speak, isSpeaking, voices } = useTTS({ language: 'ko' });
 
@@ -52,8 +55,48 @@ export function SettingsDropdown() {
             </div>
 
             <div className="p-4 space-y-4">
-              {/* 사운드 설정 */}
+              {/* 화면 모드 설정 */}
               <div className="space-y-3">
+                <p className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wide">
+                  화면 모드
+                </p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-[var(--color-text-muted)]" />
+                    <span className="text-sm text-[var(--color-text)]">표시 모드</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setMode('junior')}
+                      className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                        mode === 'junior'
+                          ? 'bg-[var(--color-primary)] text-white'
+                          : 'bg-[var(--color-background)] text-[var(--color-text-muted)]'
+                      }`}
+                    >
+                      기본
+                    </button>
+                    <button
+                      onClick={() => setMode('senior')}
+                      className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                        mode === 'senior'
+                          ? 'bg-[var(--color-primary)] text-white'
+                          : 'bg-[var(--color-background)] text-[var(--color-text-muted)]'
+                      }`}
+                    >
+                      고대비
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {mode === 'senior'
+                    ? '큰 글씨, 높은 대비로 눈에 편안합니다'
+                    : '일반적인 화면 표시입니다'}
+                </p>
+              </div>
+
+              {/* 사운드 설정 */}
+              <div className="space-y-3 pt-2 border-t border-[var(--color-border)]">
                 <p className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wide">
                   사운드
                 </p>
