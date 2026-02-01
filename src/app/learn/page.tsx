@@ -48,25 +48,30 @@ export default function LearnPage() {
   // 언어가 선택되지 않았다면 언어 선택 화면 표시
   if (!language) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)]">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-[var(--color-text)] mb-6">
-            어떤 언어를 연습할까요?
+      <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)] px-4">
+        <div className="text-center w-full max-w-md">
+          <h1 className="text-2xl font-bold text-[var(--color-text)] mb-2">
+            타자 연습 시작하기
           </h1>
-          <div className="flex gap-4 justify-center">
+          <p className="text-[var(--color-text-muted)] mb-8">
+            연습할 언어를 선택하세요
+          </p>
+          <div className="grid grid-cols-2 gap-4">
             <button
               onClick={() => useThemeStore.getState().setLanguage('ko')}
-              className="px-8 py-4 bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] hover:border-[var(--color-primary)] transition-all"
+              className="flex flex-col items-center justify-center p-6 bg-[var(--color-surface)] rounded-2xl border-2 border-[var(--color-border)] hover:border-[var(--color-primary)] hover:bg-[var(--color-surface-hover)] transition-all"
             >
-              <span className="text-3xl mb-2 block">🇰🇷</span>
-              <span className="text-lg font-medium text-[var(--color-text)]">한글</span>
+              <span className="text-5xl mb-3">🇰🇷</span>
+              <span className="text-lg font-semibold text-[var(--color-text)]">한국어</span>
+              <span className="text-sm text-[var(--color-text-muted)] mt-1">Korean</span>
             </button>
             <button
               onClick={() => useThemeStore.getState().setLanguage('en')}
-              className="px-8 py-4 bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] hover:border-[var(--color-primary)] transition-all"
+              className="flex flex-col items-center justify-center p-6 bg-[var(--color-surface)] rounded-2xl border-2 border-[var(--color-border)] hover:border-[var(--color-primary)] hover:bg-[var(--color-surface-hover)] transition-all"
             >
-              <span className="text-3xl mb-2 block">🇺🇸</span>
-              <span className="text-lg font-medium text-[var(--color-text)]">English</span>
+              <span className="text-5xl mb-3">🇺🇸</span>
+              <span className="text-lg font-semibold text-[var(--color-text)]">영어</span>
+              <span className="text-sm text-[var(--color-text-muted)] mt-1">English</span>
             </button>
           </div>
         </div>
