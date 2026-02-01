@@ -1,42 +1,24 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-
-type Language = 'en' | 'ko';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSettingsStore } from '@/stores/settings-store';
 
 interface UseTTSOptions {
-  language?: Language;
-  rate?: number;
-  autoSpeak?: boolean;
+  language?: 'ko' | 'en';
 }
 
-interface UseTTSReturn {
-  speak: (text: string) => void;
-  stop: () => void;
-  isSpeaking: boolean;
-  isSupported: boolean;
-  voices: SpeechSynthesisVoice[];
-}
-
-const PREFERRED_VOICES: Record<Language, string[]> = {
-  en: ['Google US English', 'Samantha', 'Alex', 'Daniel', 'Karen', 'Moira'],
-  ko: ['Google 한국어', 'Yuna'],
-};
-
-export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
-  const { language = 'en', rate = 0.9 } = options;
-
+export function useTTS(options: UseTTSOptions = {}) {
+  const { language = 'ko' } = options;
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isSupported, setIsSupported] = useState(true);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const resumeIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Check speech synthesis support
+  const { ttsEnabled, voiceGender, ttsVolume, getTTSRate } = useSettingsStore();
+
+  // 음성 목록 로드
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) {
-      setIsSupported(false);
-      return;
-    }
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
 
     const loadVoices = () => {
       const available = window.speechSynthesis.getVoices();
@@ -50,67 +32,150 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
 
     return () => {
       window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
-    };
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
+      if (resumeIntervalRef.current) {
+        clearInterval(resumeIntervalRef.current);
       }
     };
   }, []);
 
-  // Get preferred voice for language
-  const getPreferredVoice = useCallback(
-    (lang: Language): SpeechSynthesisVoice | undefined => {
-      if (voices.length === 0) return undefined;
+  // 성별에 맞는 음성 선택
+  const getPreferredVoice = useCallback((lang: 'ko' | 'en') => {
+    if (voices.length === 0) return undefined;
 
-      const langCode = lang === 'en' ? 'en' : 'ko';
-      const langVoices = voices.filter((v) => v.lang.startsWith(langCode));
-      const preferred = langVoices.find((v) =>
-        PREFERRED_VOICES[lang].some((name) => v.name.includes(name))
-      );
+    const langCode = lang === 'ko' ? 'ko' : 'en';
+    const langVoices = voices.filter(v => v.lang.startsWith(langCode));
 
-      return preferred || langVoices[0] || undefined;
-    },
-    [voices]
-  );
+    if (langVoices.length === 0) return undefined;
 
-  // Speak text
-  const speak = useCallback(
-    (text: string) => {
-      if (!text || !isSupported || typeof window === 'undefined') return;
+    // 성별에 따른 음성 선택
+    if (lang === 'ko') {
+      if (voiceGender === 'female') {
+        // 여성 음성 우선
+        const femaleVoices = ['Yuna', 'Google 한국어', 'Siri', 'Samantha'];
+        const preferred = langVoices.find(v =>
+          femaleVoices.some(name => v.name.includes(name))
+        );
+        return preferred || langVoices[0];
+      } else {
+        // 남성 음성 우선
+        const maleVoices = ['Minsu', 'Google 한국어 남성'];
+        const preferred = langVoices.find(v =>
+          maleVoices.some(name => v.name.includes(name))
+        );
+        return preferred || langVoices[0];
+      }
+    } else {
+      if (voiceGender === 'female') {
+        const femaleVoices = ['Samantha', 'Karen', 'Moira', 'Fiona', 'Google US English Female'];
+        const preferred = langVoices.find(v =>
+          femaleVoices.some(name => v.name.includes(name))
+        );
+        return preferred || langVoices[0];
+      } else {
+        const maleVoices = ['Alex', 'Daniel', 'Fred', 'Google US English Male'];
+        const preferred = langVoices.find(v =>
+          maleVoices.some(name => v.name.includes(name))
+        );
+        return preferred || langVoices[0];
+      }
+    }
+  }, [voices, voiceGender]);
 
-      window.speechSynthesis.cancel();
+  // 음성 재생
+  const speak = useCallback((text: string, langOverride?: 'ko' | 'en') => {
+    if (!text || typeof window === 'undefined' || !window.speechSynthesis) return;
+    if (!ttsEnabled) return;
 
+    const targetLang = langOverride || language;
+
+    // Chrome 버그 우회: 먼저 cancel
+    window.speechSynthesis.cancel();
+
+    // 이전 interval 정리
+    if (resumeIntervalRef.current) {
+      clearInterval(resumeIntervalRef.current);
+      resumeIntervalRef.current = null;
+    }
+
+    // Chrome에서 speechSynthesis가 pause 상태로 stuck되는 버그 우회
+    // 주기적으로 resume() 호출
+    resumeIntervalRef.current = setInterval(() => {
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+      if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
+        if (resumeIntervalRef.current) {
+          clearInterval(resumeIntervalRef.current);
+          resumeIntervalRef.current = null;
+        }
+      }
+    }, 100);
+
+    // 약간의 지연 후 speak (Chrome에서 cancel 후 바로 speak하면 작동 안함)
+    setTimeout(() => {
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = language === 'ko' ? 'ko-KR' : 'en-US';
-      utterance.rate = rate;
+      utterance.lang = targetLang === 'ko' ? 'ko-KR' : 'en-US';
+      utterance.rate = getTTSRate();
+      utterance.volume = ttsVolume;
 
-      const voice = getPreferredVoice(language);
+      const voice = getPreferredVoice(targetLang);
       if (voice) {
         utterance.voice = voice;
       }
 
       utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        if (resumeIntervalRef.current) {
+          clearInterval(resumeIntervalRef.current);
+          resumeIntervalRef.current = null;
+        }
+      };
+      utterance.onerror = (e) => {
+        // Chrome에서 interrupted 에러는 무시
+        if (e.error !== 'interrupted') {
+          console.warn('TTS error:', e.error);
+        }
+        setIsSpeaking(false);
+        if (resumeIntervalRef.current) {
+          clearInterval(resumeIntervalRef.current);
+          resumeIntervalRef.current = null;
+        }
+      };
 
       utteranceRef.current = utterance;
-      window.speechSynthesis.speak(utterance);
-    },
-    [language, rate, isSupported, getPreferredVoice]
-  );
 
-  // Stop speaking
+      // Chrome resume 버그 우회
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(utterance);
+    }, 100);
+  }, [language, ttsEnabled, ttsVolume, getTTSRate, getPreferredVoice]);
+
+  // 음성 정지
   const stop = useCallback(() => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
+      if (resumeIntervalRef.current) {
+        clearInterval(resumeIntervalRef.current);
+        resumeIntervalRef.current = null;
+      }
     }
   }, []);
+
+  // 컴포넌트 언마운트 시 정리
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      if (resumeIntervalRef.current) {
+        clearInterval(resumeIntervalRef.current);
+      }
+    };
+  }, []);
+
+  const isSupported = typeof window !== 'undefined' && !!window.speechSynthesis;
 
   return {
     speak,
@@ -118,5 +183,6 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
     isSpeaking,
     isSupported,
     voices,
+    ttsEnabled,
   };
 }

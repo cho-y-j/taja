@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { MetricsDisplay } from '@/components/typing/metrics-display';
 import { useTypingEngine } from '@/hooks/use-typing-engine';
+import { useTTS } from '@/hooks/use-tts';
 import { wordLevels, getRandomWordsWithMeaning, type WordWithMeaning } from '@/lib/typing/word-practice';
 import { useThemeStore } from '@/stores/theme-store';
 
@@ -27,30 +28,14 @@ export default function WordPracticePage() {
 
   const currentLevelData = wordLevels[currentLevel - 1];
 
-  // TTS 함수 (Chrome 버그 우회 포함)
+  // TTS 훅 사용
+  const { speak: speakTTS, ttsEnabled } = useTTS({ language });
+
+  // TTS 함수 래퍼
   const speakWord = useCallback((word: string) => {
-    if (!word || typeof window === 'undefined' || !window.speechSynthesis) return;
-
-    // Chrome 버그 우회: cancel 후 resume 필요
-    window.speechSynthesis.cancel();
-
-    // Chrome에서 speechSynthesis가 stuck 되는 버그 우회
-    const timer = setInterval(() => {
-      if (!window.speechSynthesis.speaking) {
-        clearInterval(timer);
-      }
-    }, 100);
-
-    setTimeout(() => {
-      const utterance = new SpeechSynthesisUtterance(word);
-      utterance.lang = language === 'ko' ? 'ko-KR' : 'en-US';
-      utterance.rate = 0.9;
-
-      // Chrome resume 버그 우회
-      window.speechSynthesis.resume();
-      window.speechSynthesis.speak(utterance);
-    }, 50);
-  }, [language]);
+    if (!word) return;
+    speakTTS(word, language);
+  }, [language, speakTTS]);
 
   // 연습 텍스트 생성
   useEffect(() => {

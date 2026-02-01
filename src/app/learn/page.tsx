@@ -7,11 +7,10 @@ import {
   BookOpen,
   Sparkles,
   ChevronRight,
-  Settings,
   Lock,
 } from 'lucide-react';
 import { useThemeStore } from '@/stores/theme-store';
-import { UserMenu } from '@/components/layout/user-menu';
+import { UserMenu, SettingsDropdown } from '@/components/layout';
 import { CreditBalance, UpgradeModal } from '@/components/credits';
 
 // Clerk가 설정되어 있는지 확인
@@ -86,9 +85,7 @@ export default function LearnPage() {
 
           <div className="flex items-center gap-2">
             <CreditBalance />
-            <button onClick={toggleMode} className="icon-btn">
-              <Settings className="w-5 h-5" />
-            </button>
+            <SettingsDropdown />
             <UserMenu />
           </div>
         </div>

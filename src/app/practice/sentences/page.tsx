@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useThemeStore } from '@/stores/theme-store';
+import { useTTS } from '@/hooks/use-tts';
 import {
   sentenceCategories,
   getSentencesByCategory,
@@ -75,23 +76,14 @@ export default function SentencePracticePage() {
   // 현재 문장 번역
   const currentTranslation = sentences[currentSentenceIndex]?.translation || '';
 
-  // TTS 함수 (Chrome 버그 우회 포함)
+  // TTS 훅 사용
+  const { speak: speakTTS, ttsEnabled } = useTTS({ language: language as 'ko' | 'en' });
+
+  // TTS 함수 래퍼
   const speakSentence = useCallback((text: string) => {
-    if (!text || typeof window === 'undefined' || !window.speechSynthesis) return;
-
-    // Chrome 버그 우회
-    window.speechSynthesis.cancel();
-
-    setTimeout(() => {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = language === 'ko' ? 'ko-KR' : 'en-US';
-      utterance.rate = 0.9;
-
-      // Chrome resume 버그 우회
-      window.speechSynthesis.resume();
-      window.speechSynthesis.speak(utterance);
-    }, 50);
-  }, [language]);
+    if (!text) return;
+    speakTTS(text, language as 'ko' | 'en');
+  }, [language, speakTTS]);
 
   // 카테고리별 문장 목록 가져오기 및 섞기
   const loadSentences = useCallback((category: string) => {

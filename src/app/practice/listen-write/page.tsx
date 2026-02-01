@@ -19,12 +19,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { MetricsDisplay } from '@/components/typing/metrics-display';
 import { useTypingEngine } from '@/hooks/use-typing-engine';
+import { useTTS } from '@/hooks/use-tts';
 import {
   getSampleSentences,
   getRandomSentence,
   type PracticeSentence,
 } from '@/lib/typing/sentence-practice';
 import { useThemeStore } from '@/stores/theme-store';
+import { useSettingsStore } from '@/stores/settings-store';
 
 type Language = 'en' | 'ko';
 type ViewMode = 'select' | 'practice';
@@ -45,32 +47,10 @@ export default function ListenWritePracticePage() {
   const [currentSentence, setCurrentSentence] = useState<PracticeSentence | null>(null);
   const [practiceText, setPracticeText] = useState('');
   const [showHint, setShowHint] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(true);
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // Check if speech synthesis is supported & load voices
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) {
-      setSpeechSupported(false);
-      return;
-    }
-
-    const loadVoices = () => {
-      const available = window.speechSynthesis.getVoices();
-      if (available.length > 0) {
-        setVoices(available);
-      }
-    };
-
-    loadVoices();
-    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
-
-    return () => {
-      window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
-    };
-  }, []);
+  // TTS 훅 사용
+  const { speak: speakTTS, stop: stopTTS, isSpeaking, isSupported: speechSupported } = useTTS({ language });
+  const { getTTSRate } = useSettingsStore();
 
   const {
     metrics,
@@ -140,72 +120,16 @@ export default function ListenWritePracticePage() {
     }
   }, [isStarted, userInput, processInput, processBackspace, startSession]);
 
-  // 자연스러운 음성 선택
-  const getPreferredVoice = useCallback((lang: Language) => {
-    if (voices.length === 0) return undefined;
-
-    if (lang === 'en') {
-      const preferredNames = ['Google US English', 'Samantha', 'Alex', 'Daniel', 'Karen', 'Moira'];
-      const englishVoices = voices.filter(v => v.lang.startsWith('en'));
-      const preferred = englishVoices.find(v =>
-        preferredNames.some(name => v.name.includes(name))
-      );
-      return preferred || englishVoices[0] || undefined;
-    } else {
-      const preferredNames = ['Google 한국어', 'Yuna'];
-      const koreanVoices = voices.filter(v => v.lang.startsWith('ko'));
-      const preferred = koreanVoices.find(v =>
-        preferredNames.some(name => v.name.includes(name))
-      );
-      return preferred || koreanVoices[0] || undefined;
-    }
-  }, [voices]);
-
-  // Speak the sentence (Chrome 버그 우회 포함)
+  // Speak the sentence (TTS 훅 사용)
   const speakSentence = useCallback(() => {
-    if (!currentSentence || !speechSupported || typeof window === 'undefined') return;
-
-    // Chrome 버그 우회: cancel 후 resume 필요
-    window.speechSynthesis.cancel();
-
-    setTimeout(() => {
-      const utterance = new SpeechSynthesisUtterance(currentSentence.text);
-      utterance.lang = language === 'ko' ? 'ko-KR' : 'en-US';
-      utterance.rate = difficultyInfo[difficulty].speed;
-
-      const voice = getPreferredVoice(language);
-      if (voice) {
-        utterance.voice = voice;
-      }
-
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
-
-      speechRef.current = utterance;
-
-      // Chrome resume 버그 우회
-      window.speechSynthesis.resume();
-      window.speechSynthesis.speak(utterance);
-    }, 50);
-  }, [currentSentence, language, difficulty, speechSupported, getPreferredVoice]);
+    if (!currentSentence || !speechSupported) return;
+    speakTTS(currentSentence.text, language);
+  }, [currentSentence, language, speechSupported, speakTTS]);
 
   // Stop speaking
   const stopSpeaking = useCallback(() => {
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
-    }
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-    };
-  }, []);
+    stopTTS();
+  }, [stopTTS]);
 
 
   // 연습 시작

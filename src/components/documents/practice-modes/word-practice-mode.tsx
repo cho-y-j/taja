@@ -5,10 +5,10 @@ import { Clock, Target, Zap, Trophy, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { extractWords } from '@/lib/documents/document-utils';
-import { getPreferredVoice } from '@/lib/speech/tts-utils';
 import { playErrorSound, playKeySound } from '@/lib/utils/sound';
 import { useDocumentStore, type UserDocument } from '@/stores/document-store';
 import { TimeSelector, PracticeControls, PracticeResult } from '@/components/practice';
+import { useTTS } from '@/hooks/use-tts';
 
 type ViewMode = 'time' | 'practice' | 'result';
 
@@ -73,10 +73,11 @@ export function WordPracticeMode({ document: doc }: Props) {
     totalTime: 0,
   });
 
-  // Audio
+  // Audio - TTS 훅 사용
   const [autoListen, setAutoListen] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const { speak: speakTTS, stop: stopTTS, isSpeaking, ttsEnabled } = useTTS({
+    language: doc.language as 'ko' | 'en',
+  });
 
   // Translation
   const [showTranslation, setShowTranslation] = useState(false);
@@ -89,47 +90,20 @@ export function WordPracticeMode({ document: doc }: Props) {
   const isFinishedRef = useRef(false);
   const isComposingRef = useRef(false);
 
-  // Load voices
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    const loadVoices = () => {
-      const available = window.speechSynthesis.getVoices();
-      if (available.length > 0) setVoices(available);
-    };
-    loadVoices();
-    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
-    return () => window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
-  }, []);
-
   // Cleanup
   useEffect(() => {
     return () => {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
+      stopTTS();
       if (timerRef.current) clearInterval(timerRef.current);
       if (wpmTimerRef.current) clearInterval(wpmTimerRef.current);
     };
-  }, []);
+  }, [stopTTS]);
 
-  // Speak word (Chrome 버그 우회 포함)
+  // Speak word (TTS 훅 사용)
   const speakWord = useCallback((word: string) => {
-    if (!word || typeof window === 'undefined' || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-
-    setTimeout(() => {
-      const utterance = new SpeechSynthesisUtterance(word);
-      utterance.lang = doc.language === 'ko' ? 'ko-KR' : 'en-US';
-      const voice = getPreferredVoice(voices, doc.language);
-      if (voice) utterance.voice = voice;
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
-
-      window.speechSynthesis.resume();
-      window.speechSynthesis.speak(utterance);
-    }, 50);
-  }, [doc.language, voices]);
+    if (!word) return;
+    speakTTS(word);
+  }, [speakTTS]);
 
   // Initialize words
   const initializeWords = useCallback(() => {
@@ -160,10 +134,10 @@ export function WordPracticeMode({ document: doc }: Props) {
     isFinishedRef.current = true;
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     if (wpmTimerRef.current) { clearInterval(wpmTimerRef.current); wpmTimerRef.current = null; }
-    window.speechSynthesis?.cancel();
+    stopTTS();
     setSessionStats(prev => ({ ...prev, totalTime: Date.now() - startTimeRef.current }));
     setViewMode('result');
-  }, []);
+  }, [stopTTS]);
 
   // Timer
   useEffect(() => {
