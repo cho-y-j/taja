@@ -7,6 +7,44 @@ interface UseTTSOptions {
   language?: 'ko' | 'en';
 }
 
+// Chrome 오디오 컨텍스트 활성화 상태
+let audioContextUnlocked = false;
+
+// Chrome 오디오 컨텍스트 활성화 (사용자 상호작용 필요)
+function unlockAudioContext(): Promise<void> {
+  return new Promise((resolve) => {
+    if (audioContextUnlocked) {
+      resolve();
+      return;
+    }
+
+    try {
+      // AudioContext 생성 및 resume
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextClass) {
+        const ctx = new AudioContextClass();
+        // 무음 버퍼 재생
+        const buffer = ctx.createBuffer(1, 1, 22050);
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(ctx.destination);
+        source.start(0);
+
+        ctx.resume().then(() => {
+          audioContextUnlocked = true;
+          console.log('[TTS] AudioContext unlocked');
+          resolve();
+        });
+      } else {
+        resolve();
+      }
+    } catch (e) {
+      console.log('[TTS] AudioContext unlock failed:', e);
+      resolve();
+    }
+  });
+}
+
 export function useTTS(options: UseTTSOptions = {}) {
   const { language = 'ko' } = options;
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -29,13 +67,9 @@ export function useTTS(options: UseTTSOptions = {}) {
       }
     };
 
-    // 즉시 로드 시도
     loadVoices();
-
-    // Chrome에서는 voiceschanged 이벤트 후에 voices가 로드됨
     window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
 
-    // 폴백: 여러 번 시도
     const timers = [
       setTimeout(loadVoices, 100),
       setTimeout(loadVoices, 300),
@@ -61,7 +95,6 @@ export function useTTS(options: UseTTSOptions = {}) {
 
     if (langVoices.length === 0) return undefined;
 
-    // 성별에 따른 음성 선택
     if (lang === 'ko') {
       if (voiceGender === 'female') {
         const femaleVoices = ['Yuna', 'Google 한국어', 'Siri'];
@@ -94,18 +127,21 @@ export function useTTS(options: UseTTSOptions = {}) {
   }, [voices, voiceGender]);
 
   // 음성 재생
-  const speak = useCallback((text: string, langOverride?: 'ko' | 'en') => {
+  const speak = useCallback(async (text: string, langOverride?: 'ko' | 'en') => {
     if (!text || typeof window === 'undefined' || !window.speechSynthesis) {
-      console.log('[TTS] Not available:', { text: !!text, window: typeof window !== 'undefined' });
+      console.log('[TTS] Not available');
       return;
     }
     if (!ttsEnabled) {
-      console.log('[TTS] TTS disabled in settings');
+      console.log('[TTS] Disabled');
       return;
     }
 
     const targetLang = langOverride || language;
     console.log('[TTS] Speaking:', text.substring(0, 30), 'lang:', targetLang);
+
+    // Chrome 오디오 컨텍스트 활성화
+    await unlockAudioContext();
 
     // 이전 interval 정리
     if (resumeIntervalRef.current) {
@@ -116,74 +152,72 @@ export function useTTS(options: UseTTSOptions = {}) {
     // 현재 재생 중인 것 취소
     window.speechSynthesis.cancel();
 
-    // Chrome pause 버그 우회 - 주기적으로 resume 호출
+    // Chrome resume 버그 우회 - 주기적으로 resume
     resumeIntervalRef.current = setInterval(() => {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        if (window.speechSynthesis.paused) {
-          console.log('[TTS] Resuming paused speech');
-          window.speechSynthesis.resume();
-        }
-        // 재생이 끝났으면 interval 정리
-        if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
-          if (resumeIntervalRef.current) {
-            clearInterval(resumeIntervalRef.current);
-            resumeIntervalRef.current = null;
-          }
-        }
+      if (window.speechSynthesis?.paused) {
+        console.log('[TTS] Resuming...');
+        window.speechSynthesis.resume();
+      }
+    }, 250);
+
+    // Chrome에서 cancel 후 대기
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = targetLang === 'ko' ? 'ko-KR' : 'en-US';
+    utterance.rate = getTTSRate();
+    utterance.volume = ttsVolume;
+
+    const voice = getPreferredVoice(targetLang);
+    if (voice) {
+      utterance.voice = voice;
+      console.log('[TTS] Voice:', voice.name);
+    }
+
+    utterance.onstart = () => {
+      console.log('[TTS] Started');
+      setIsSpeaking(true);
+    };
+
+    utterance.onend = () => {
+      console.log('[TTS] Ended');
+      setIsSpeaking(false);
+      if (resumeIntervalRef.current) {
+        clearInterval(resumeIntervalRef.current);
+        resumeIntervalRef.current = null;
+      }
+    };
+
+    utterance.onerror = (e) => {
+      if (e.error !== 'interrupted' && e.error !== 'canceled') {
+        console.error('[TTS] Error:', e.error);
+      }
+      setIsSpeaking(false);
+      if (resumeIntervalRef.current) {
+        clearInterval(resumeIntervalRef.current);
+        resumeIntervalRef.current = null;
+      }
+    };
+
+    utteranceRef.current = utterance;
+
+    // Chrome 버그 우회 - resume 먼저
+    window.speechSynthesis.resume();
+
+    // speak 호출
+    window.speechSynthesis.speak(utterance);
+
+    // 상태 체크
+    console.log('[TTS] After speak() - pending:', window.speechSynthesis.pending, 'speaking:', window.speechSynthesis.speaking);
+
+    // Chrome 추가 우회 - 100ms 후에도 pending이면 다시 시도
+    setTimeout(() => {
+      if (window.speechSynthesis && !window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
+        console.log('[TTS] Retry speak...');
+        window.speechSynthesis.speak(utterance);
       }
     }, 200);
 
-    // Chrome에서 cancel 후 약간 대기 필요
-    setTimeout(() => {
-      if (typeof window === 'undefined' || !window.speechSynthesis) return;
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = targetLang === 'ko' ? 'ko-KR' : 'en-US';
-      utterance.rate = getTTSRate();
-      utterance.volume = ttsVolume;
-
-      // 음성 선택
-      const voice = getPreferredVoice(targetLang);
-      if (voice) {
-        utterance.voice = voice;
-        console.log('[TTS] Using voice:', voice.name);
-      } else {
-        console.log('[TTS] No voice found, using default');
-      }
-
-      utterance.onstart = () => {
-        console.log('[TTS] Started speaking');
-        setIsSpeaking(true);
-      };
-
-      utterance.onend = () => {
-        console.log('[TTS] Finished speaking');
-        setIsSpeaking(false);
-        if (resumeIntervalRef.current) {
-          clearInterval(resumeIntervalRef.current);
-          resumeIntervalRef.current = null;
-        }
-      };
-
-      utterance.onerror = (e) => {
-        if (e.error !== 'interrupted' && e.error !== 'canceled') {
-          console.error('[TTS] Error:', e.error);
-        }
-        setIsSpeaking(false);
-        if (resumeIntervalRef.current) {
-          clearInterval(resumeIntervalRef.current);
-          resumeIntervalRef.current = null;
-        }
-      };
-
-      utteranceRef.current = utterance;
-
-      // Chrome resume 버그 우회
-      window.speechSynthesis.resume();
-      window.speechSynthesis.speak(utterance);
-
-      console.log('[TTS] speak() called, pending:', window.speechSynthesis.pending, 'speaking:', window.speechSynthesis.speaking);
-    }, 150); // Chrome은 150ms 정도 대기 필요
   }, [language, ttsEnabled, ttsVolume, getTTSRate, getPreferredVoice]);
 
   // 음성 정지
@@ -198,7 +232,7 @@ export function useTTS(options: UseTTSOptions = {}) {
     }
   }, []);
 
-  // 컴포넌트 언마운트 시 정리
+  // 언마운트 시 정리
   useEffect(() => {
     return () => {
       if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -210,13 +244,11 @@ export function useTTS(options: UseTTSOptions = {}) {
     };
   }, []);
 
-  const isSupported = typeof window !== 'undefined' && !!window.speechSynthesis;
-
   return {
     speak,
     stop,
     isSpeaking,
-    isSupported,
+    isSupported: typeof window !== 'undefined' && !!window.speechSynthesis,
     isReady,
     voices,
     ttsEnabled,
