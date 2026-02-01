@@ -3,199 +3,303 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Play, Home, X, Globe } from 'lucide-react';
-import { PracticeControls } from '@/components/practice';
+import { ArrowLeft, Clock, Target, Zap, Trophy, Play, Pause, Globe } from 'lucide-react';
+import { TimeSelector, PracticeControls, PracticeResult } from '@/components/practice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { MetricsDisplay } from '@/components/typing/metrics-display';
 import { SettingsDropdown, UserMenu } from '@/components/layout';
-import { useTypingEngine } from '@/hooks/use-typing-engine';
 import { useTTS } from '@/hooks/use-tts';
 import { wordLevels, getRandomWordsWithMeaning, type WordWithMeaning } from '@/lib/typing/word-practice';
 import { useThemeStore } from '@/stores/theme-store';
+import { playErrorSound, playKeySound } from '@/lib/utils/sound';
 
 type Language = 'en' | 'ko';
+type ViewMode = 'level' | 'time' | 'practice' | 'result';
+
+interface SessionStats {
+  totalWords: number;
+  totalCharacters: number;
+  correctCharacters: number;
+  totalTime: number;
+}
 
 export default function WordPracticePage() {
   const router = useRouter();
   const { language: storeLanguage, setLanguage: setStoreLanguage } = useThemeStore();
   const [language, setLanguage] = useState<Language>(storeLanguage || 'en');
   const [currentLevel, setCurrentLevel] = useState(1);
-  const [practiceText, setPracticeText] = useState('');
-  const [showLevelSelect, setShowLevelSelect] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>('level');
+
+  // Words data
   const [wordsWithMeaning, setWordsWithMeaning] = useState<WordWithMeaning[]>([]);
+  const [currentWordIndex, setCurrentWordIndex] = useState(0);
+  const [userInput, setUserInput] = useState('');
+  const [isStarted, setIsStarted] = useState(false);
+
+  // Timer
+  const [practiceTime, setPracticeTime] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // Stats
+  const [currentWpm, setCurrentWpm] = useState(0);
+  const [sessionStats, setSessionStats] = useState<SessionStats>({
+    totalWords: 0,
+    totalCharacters: 0,
+    correctCharacters: 0,
+    totalTime: 0,
+  });
+
+  // Options
   const [showTranslation, setShowTranslation] = useState(false);
   const [autoListen, setAutoListen] = useState(false);
 
   const currentLevelData = wordLevels[currentLevel - 1];
+  const currentWord = wordsWithMeaning[currentWordIndex]?.word || '';
+  const currentMeaning = wordsWithMeaning[currentWordIndex]?.meaning || '';
 
-  // TTS 훅 사용
-  const { speak: speakTTS, ttsEnabled } = useTTS({ language });
+  // TTS
+  const { speak: speakTTS, stop: stopTTS, ttsEnabled } = useTTS({ language });
 
-  // TTS 함수 래퍼
   const speakWord = useCallback((word: string) => {
     if (!word) return;
     speakTTS(word, language);
   }, [language, speakTTS]);
 
-  // 연습 텍스트 생성
-  useEffect(() => {
-    if (!showLevelSelect) {
-      const words = getRandomWordsWithMeaning(language, currentLevel, 10);
-      setWordsWithMeaning(words);
-      setPracticeText(words.map(w => w.word).join(' '));
-    }
-  }, [currentLevel, showLevelSelect, language]);
-
-  const {
-    metrics,
-    isComplete,
-    isPaused,
-    isStarted,
-    userInput,
-    getCharacterFeedback,
-    reset,
-    pause,
-    resume,
-    processInput,
-    processBackspace,
-    startSession,
-  } = useTypingEngine(practiceText, 'words');
-
-  // 현재 단어 위치 기반으로 해석 가져오기
-  const currentWordIndex = useMemo(() => {
-    const typed = practiceText.substring(0, userInput?.length || 0);
-    const spacesBeforeCurrent = (typed.match(/ /g) || []).length;
-    return Math.min(spacesBeforeCurrent, wordsWithMeaning.length - 1);
-  }, [practiceText, userInput, wordsWithMeaning.length]);
-
-  const currentMeaning = wordsWithMeaning[currentWordIndex]?.meaning || '';
-  const currentWord = wordsWithMeaning[currentWordIndex]?.word || '';
-
-  // 자동 읽기 - 현재 단어가 바뀌면 읽기
-  useEffect(() => {
-    if (autoListen && currentWord && !showLevelSelect) {
-      speakWord(currentWord);
-    }
-  }, [autoListen, currentWord, showLevelSelect, speakWord]);
-
+  // Refs
   const inputRef = useRef<HTMLInputElement>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const wpmTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number>(0);
+  const isFinishedRef = useRef(false);
   const isComposingRef = useRef(false);
-  const [inputValue, setInputValue] = useState('');
+  const prevInputRef = useRef('');
 
-  // userInput이 리셋되면 inputValue도 리셋
+  // Cleanup
   useEffect(() => {
-    if (userInput === '') {
-      setInputValue('');
-    }
-  }, [userInput]);
+    return () => {
+      stopTTS();
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (wpmTimerRef.current) clearInterval(wpmTimerRef.current);
+    };
+  }, [stopTTS]);
 
-  // 한글 IME 조합 시작
-  const handleCompositionStart = useCallback(() => {
-    isComposingRef.current = true;
-  }, []);
-
-  // 한글 IME 조합 완료
-  const handleCompositionEnd = useCallback((e: React.CompositionEvent<HTMLInputElement>) => {
-    isComposingRef.current = false;
-    const value = e.currentTarget.value;
-    setInputValue(value);
-
-    const currentLen = userInput.length;
-    for (let i = currentLen; i < value.length; i++) {
-      processInput(value[i]);
-    }
-  }, [userInput, processInput]);
-
-  // 입력 변경 처리
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setInputValue(value);
-
-    if (!isStarted && value.length > 0) {
-      startSession();
-    }
-
-    if (isComposingRef.current) return;
-
-    if (value.length < userInput.length) {
-      const diff = userInput.length - value.length;
-      for (let i = 0; i < diff; i++) {
-        processBackspace();
-      }
-      return;
-    }
-
-    for (let i = userInput.length; i < value.length; i++) {
-      processInput(value[i]);
-    }
-  }, [isStarted, userInput, processInput, processBackspace, startSession]);
-
-  // 연습 화면 진입 시 자동 포커스
-  useEffect(() => {
-    if (!showLevelSelect && inputRef.current) {
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
-  }, [showLevelSelect]);
-
-  // 연습 시작
-  const handleStart = useCallback(() => {
-    setShowLevelSelect(false);
-    const words = getRandomWordsWithMeaning(language, currentLevel, 10);
-    setWordsWithMeaning(words);
-    setPracticeText(words.map(w => w.word).join(' '));
-  }, [currentLevel, language]);
-
-  // 다시 연습
-  const handleRestart = useCallback(() => {
-    const words = getRandomWordsWithMeaning(language, currentLevel, 10);
-    setWordsWithMeaning(words);
-    setPracticeText(words.map(w => w.word).join(' '));
-    reset();
-    setTimeout(() => inputRef.current?.focus(), 100);
-  }, [currentLevel, language, reset]);
-
-  // 다음 레벨
-  const handleNextLevel = useCallback(() => {
-    if (currentLevel < wordLevels.length) {
-      setCurrentLevel(currentLevel + 1);
-      reset();
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
-  }, [currentLevel, reset]);
-
-  // 레벨 선택 화면으로
-  const handleBackToSelect = useCallback(() => {
-    setShowLevelSelect(true);
-    setCurrentLevel(1);
-    reset();
-  }, [reset]);
-
-  // 종료
-  const handleExit = useCallback(() => {
-    router.push('/');
-  }, [router]);
-
-  // 스토어 언어가 변경되면 로컬 상태도 동기화
+  // Store language sync
   useEffect(() => {
     if (storeLanguage && storeLanguage !== language) {
       setLanguage(storeLanguage);
     }
-  }, [storeLanguage]);
+  }, [storeLanguage, language]);
 
-  // 언어 전환
+  // Initialize words for level
+  const initializeWords = useCallback(() => {
+    const words = getRandomWordsWithMeaning(language, currentLevel, 50);
+    setWordsWithMeaning(words);
+    setCurrentWordIndex(0);
+    setUserInput('');
+    prevInputRef.current = '';
+  }, [language, currentLevel]);
+
+  // Level selection -> Time selection
+  const handleLevelSelect = useCallback((level: number) => {
+    setCurrentLevel(level);
+    setViewMode('time');
+  }, []);
+
+  // Time selection -> Practice
+  const handleTimeSelect = useCallback((seconds: number) => {
+    setPracticeTime(seconds);
+    setTimeRemaining(seconds);
+    initializeWords();
+    setViewMode('practice');
+    setIsStarted(false);
+    setIsPaused(false);
+    setCurrentWpm(0);
+    isFinishedRef.current = false;
+    setSessionStats({ totalWords: 0, totalCharacters: 0, correctCharacters: 0, totalTime: 0 });
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, [initializeWords]);
+
+  // Finish session
+  const finishSession = useCallback(() => {
+    if (isFinishedRef.current) return;
+    isFinishedRef.current = true;
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (wpmTimerRef.current) { clearInterval(wpmTimerRef.current); wpmTimerRef.current = null; }
+    stopTTS();
+    setSessionStats(prev => ({ ...prev, totalTime: Date.now() - startTimeRef.current }));
+    setViewMode('result');
+  }, [stopTTS]);
+
+  // Timer effect
+  useEffect(() => {
+    if (viewMode !== 'practice' || !isStarted || isPaused) return;
+
+    timerRef.current = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) { finishSession(); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+
+    wpmTimerRef.current = setInterval(() => {
+      if (startTimeRef.current > 0) {
+        setSessionStats(stats => {
+          const elapsed = (Date.now() - startTimeRef.current) / 60000;
+          if (elapsed > 0 && stats.correctCharacters > 0) {
+            setCurrentWpm(Math.round((stats.correctCharacters / 5) / elapsed));
+          }
+          return stats;
+        });
+      }
+    }, 500);
+
+    return () => {
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      if (wpmTimerRef.current) { clearInterval(wpmTimerRef.current); wpmTimerRef.current = null; }
+    };
+  }, [viewMode, isStarted, isPaused, finishSession]);
+
+  // Move to next word
+  const moveToNextWord = useCallback(() => {
+    const nextIndex = currentWordIndex + 1;
+    if (nextIndex < wordsWithMeaning.length) {
+      setCurrentWordIndex(nextIndex);
+      const nextWord = wordsWithMeaning[nextIndex]?.word || '';
+      if (autoListen) speakWord(nextWord);
+    } else {
+      // Get more words
+      const newWords = getRandomWordsWithMeaning(language, currentLevel, 50);
+      setWordsWithMeaning(newWords);
+      setCurrentWordIndex(0);
+      if (autoListen) speakWord(newWords[0]?.word || '');
+    }
+    setUserInput('');
+    prevInputRef.current = '';
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, [currentWordIndex, wordsWithMeaning, language, currentLevel, autoListen, speakWord]);
+
+  // Check word completion
+  const checkWordCompletion = useCallback((value: string) => {
+    if (isFinishedRef.current || !currentWord) return;
+
+    // Play sound for each new character
+    if (value.length > prevInputRef.current.length) {
+      const newCharIndex = value.length - 1;
+      if (newCharIndex < currentWord.length) {
+        if (value[newCharIndex] === currentWord[newCharIndex]) {
+          playKeySound();
+        } else {
+          playErrorSound();
+        }
+      }
+    }
+    prevInputRef.current = value;
+
+    if (value.length >= currentWord.length) {
+      let correct = 0;
+      for (let i = 0; i < currentWord.length; i++) {
+        if (value[i] === currentWord[i]) correct++;
+      }
+
+      setSessionStats(prev => {
+        const newStats = {
+          ...prev,
+          totalWords: prev.totalWords + 1,
+          totalCharacters: prev.totalCharacters + currentWord.length,
+          correctCharacters: prev.correctCharacters + correct,
+        };
+        const elapsed = (Date.now() - startTimeRef.current) / 60000;
+        if (elapsed > 0) setCurrentWpm(Math.round((newStats.correctCharacters / 5) / elapsed));
+        return newStats;
+      });
+
+      setTimeout(() => moveToNextWord(), 150);
+    }
+  }, [currentWord, moveToNextWord]);
+
+  // Input handlers
+  const handleCompositionStart = useCallback(() => { isComposingRef.current = true; }, []);
+
+  const handleCompositionEnd = useCallback((e: React.CompositionEvent<HTMLInputElement>) => {
+    isComposingRef.current = false;
+    const value = e.currentTarget.value;
+    setUserInput(value);
+    checkWordCompletion(value);
+  }, [checkWordCompletion]);
+
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setUserInput(value);
+
+    if (!isStarted && value.length > 0) {
+      setIsStarted(true);
+      startTimeRef.current = Date.now();
+    }
+
+    if (isComposingRef.current) return;
+    checkWordCompletion(value);
+  }, [isStarted, checkWordCompletion]);
+
+  // Controls
+  const togglePause = useCallback(() => setIsPaused(prev => !prev), []);
+
+  const handleRestart = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (wpmTimerRef.current) clearInterval(wpmTimerRef.current);
+    stopTTS();
+    setViewMode('time');
+    isFinishedRef.current = false;
+  }, [stopTTS]);
+
+  const handleBackToLevel = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (wpmTimerRef.current) clearInterval(wpmTimerRef.current);
+    stopTTS();
+    setViewMode('level');
+    isFinishedRef.current = false;
+  }, [stopTTS]);
+
   const toggleLanguage = useCallback(() => {
     const newLang = language === 'en' ? 'ko' : 'en';
     setLanguage(newLang);
     setStoreLanguage(newLang);
     setCurrentLevel(1);
-    reset();
-  }, [language, reset, setStoreLanguage]);
+  }, [language, setStoreLanguage]);
 
-  const isPassed = isComplete && metrics.accuracy >= currentLevelData?.targetAccuracy;
+  // Helpers
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
-  // 레벨 선택 화면
-  if (showLevelSelect) {
+  const getCharacterFeedback = () => {
+    return currentWord.split('').map((char, index) => {
+      if (index < userInput.length) {
+        return { char, status: userInput[index] === char ? 'correct' : 'incorrect' };
+      }
+      if (index === userInput.length) return { char, status: 'current' };
+      return { char, status: 'pending' };
+    });
+  };
+
+  const getCurrentAccuracy = () => {
+    if (sessionStats.totalCharacters === 0) return 100;
+    return Math.round((sessionStats.correctCharacters / sessionStats.totalCharacters) * 100);
+  };
+
+  const getResults = () => {
+    const accuracy = sessionStats.totalCharacters > 0
+      ? Math.round((sessionStats.correctCharacters / sessionStats.totalCharacters) * 100)
+      : 0;
+    const minutes = practiceTime / 60;
+    const wpm = minutes > 0 ? Math.round((sessionStats.correctCharacters / 5) / minutes) : 0;
+    return { accuracy, wpm };
+  };
+
+  // Level selection screen
+  if (viewMode === 'level') {
     return (
       <div className="min-h-screen bg-[var(--color-background)]">
         <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -239,7 +343,7 @@ export default function WordPracticePage() {
                 className={`cursor-pointer transition-all hover:shadow-lg ${
                   currentLevel === level.level ? 'ring-2 ring-[var(--color-primary)]' : ''
                 }`}
-                onClick={() => setCurrentLevel(level.level)}
+                onClick={() => handleLevelSelect(level.level)}
               >
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -248,7 +352,7 @@ export default function WordPracticePage() {
                     </span>
                   </CardTitle>
                   <CardDescription>
-                    {language === 'en' ? level.descriptionKo : level.descriptionKo}
+                    {level.descriptionKo}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -259,134 +363,258 @@ export default function WordPracticePage() {
               </Card>
             ))}
           </div>
-
-          <div className="mt-8 text-center">
-            <Button size="lg" onClick={handleStart}>
-              <Play className="w-5 h-5 mr-2" />
-              레벨 {currentLevel} 시작
-            </Button>
-          </div>
         </main>
       </div>
     );
   }
 
-  // 연습 화면
-  return (
-    <div className="min-h-screen bg-[var(--color-background)]">
-      <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={handleBackToSelect}>
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">{language === 'en' ? '🇺🇸' : '🇰🇷'}</span>
-                  <h1 className="text-xl font-bold">단어 연습</h1>
+  // Time selection screen
+  if (viewMode === 'time') {
+    return (
+      <div className="min-h-screen bg-[var(--color-background)]">
+        <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={handleBackToLevel}>
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">{language === 'en' ? '🇺🇸' : '🇰🇷'}</span>
+                    <h1 className="text-xl font-bold">단어 연습</h1>
+                  </div>
+                  <p className="text-sm text-[var(--color-text-muted)]">
+                    레벨 {currentLevel}: {currentLevelData?.descriptionKo}
+                  </p>
                 </div>
-                <p className="text-sm text-[var(--color-text-muted)]">
-                  레벨 {currentLevel} / {wordLevels.length}
-                </p>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={toggleLanguage}>
-                <Globe className="w-4 h-4 mr-2" />
-                {language === 'en' ? '한글' : 'EN'}
-              </Button>
-              <SettingsDropdown />
-              <UserMenu />
-              <Button variant="ghost" size="sm" onClick={handleExit}>
-                <X className="w-4 h-4 mr-2" />
-                종료
-              </Button>
+              <div className="flex items-center gap-2">
+                <SettingsDropdown />
+                <UserMenu />
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* 레벨 정보 */}
-        <Card className="mb-6">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">
-              레벨 {currentLevel}: {currentLevelData.descriptionKo}
-            </CardTitle>
-            <CardDescription>
-              목표 정확도: {currentLevelData.targetAccuracy}%
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <main className="container mx-auto px-4 py-8 max-w-2xl">
+          <TimeSelector
+            presets={[60, 180, 300]}
+            onSelect={handleTimeSelect}
+            itemLabel="단어"
+            customEnabled
+          />
+        </main>
+      </div>
+    );
+  }
 
-        {/* 타이핑 영역 */}
-        <Card className="mb-6">
-          <CardContent className="py-6">
-            {/* 목표 텍스트 (위) */}
-            <div className="typing-text-display typing-text-xl mb-2 min-h-[60px] text-center">
-              {getCharacterFeedback().map((item, index) => (
-                <span
-                  key={index}
-                  className={`${
-                    item.status === 'correct'
-                      ? 'text-green-600'
-                      : item.status === 'incorrect'
-                      ? 'text-red-500 bg-red-100'
-                      : item.status === 'current'
-                      ? 'bg-yellow-300 text-[var(--color-text)] animate-pulse'
-                      : 'text-gray-400'
-                  }`}
-                >
-                  {item.char === ' ' ? '\u00A0' : item.char}
-                </span>
-              ))}
-            </div>
+  // Practice screen
+  if (viewMode === 'practice') {
+    const feedback = getCharacterFeedback();
+    const progressPercent = practiceTime > 0 ? ((practiceTime - timeRemaining) / practiceTime) * 100 : 0;
+    const isUrgent = timeRemaining <= 10;
 
-            {/* 해석 표시 */}
-            {showTranslation && currentMeaning && (
-              <div className="text-center mb-4 text-[var(--color-text-muted)] text-sm">
-                ({currentMeaning})
+    return (
+      <div className="min-h-screen bg-[var(--color-background)]">
+        <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={handleBackToLevel}>
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">{language === 'en' ? '🇺🇸' : '🇰🇷'}</span>
+                    <h1 className="text-xl font-bold">단어 연습</h1>
+                  </div>
+                  <p className="text-sm text-[var(--color-text-muted)]">
+                    레벨 {currentLevel}: {currentLevelData?.descriptionKo}
+                  </p>
+                </div>
               </div>
-            )}
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={toggleLanguage}>
+                  <Globe className="w-4 h-4 mr-2" />
+                  {language === 'en' ? '한글' : 'EN'}
+                </Button>
+                <SettingsDropdown />
+                <UserMenu />
+              </div>
+            </div>
+          </div>
+        </header>
 
-            {/* 입력 필드 (아래) */}
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={handleInputChange}
-              onCompositionStart={handleCompositionStart}
-              onCompositionEnd={handleCompositionEnd}
-              disabled={isPaused || isComplete}
-              className="w-full p-4 text-xl border-2 border-[var(--color-border)] rounded-lg
-                       focus:border-[var(--color-primary)] focus:outline-none
-                       bg-[var(--color-surface)] font-mono"
-              placeholder={!isStarted ? (language === 'en' ? 'Start typing here...' : '여기에 입력하세요...') : ''}
-              autoFocus
+        <main className="container mx-auto px-4 py-6 max-w-2xl">
+          {/* Progress bar */}
+          <div className="h-1 bg-gray-200 mb-4 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[var(--color-primary)] transition-all duration-1000"
+              style={{ width: `${progressPercent}%` }}
             />
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* 메트릭 표시 */}
-        <MetricsDisplay metrics={metrics} className="mb-6" />
+          {/* Stats panel */}
+          <div className="grid grid-cols-4 gap-3 mb-4">
+            <div className={`col-span-2 rounded-xl p-3 text-center transition-all ${
+              isUrgent ? 'bg-red-100 border-2 border-red-400 animate-pulse' : 'bg-[var(--color-surface)] border border-[var(--color-border)]'
+            }`}>
+              <div className="flex items-center justify-center gap-2">
+                <Clock className={`w-5 h-5 ${isUrgent ? 'text-red-600' : 'text-[var(--color-primary)]'}`} />
+                <span className={`text-3xl font-mono font-bold ${isUrgent ? 'text-red-600' : ''}`}>
+                  {formatTime(timeRemaining)}
+                </span>
+              </div>
+              <p className="text-xs text-[var(--color-text-muted)]">남은 시간</p>
+            </div>
+            <div className="rounded-xl p-3 text-center bg-[var(--color-surface)] border border-[var(--color-border)]">
+              <div className="flex items-center justify-center gap-1">
+                <Zap className="w-4 h-4 text-[var(--color-secondary)]" />
+                <span className="text-2xl font-bold text-[var(--color-secondary)]">{currentWpm}</span>
+              </div>
+              <p className="text-xs text-[var(--color-text-muted)]">WPM</p>
+            </div>
+            <div className="rounded-xl p-3 text-center bg-[var(--color-surface)] border border-[var(--color-border)]">
+              <div className="flex items-center justify-center gap-1">
+                <Target className="w-4 h-4 text-[var(--color-success)]" />
+                <span className="text-2xl font-bold text-[var(--color-success)]">{getCurrentAccuracy()}%</span>
+              </div>
+              <p className="text-xs text-[var(--color-text-muted)]">정확도</p>
+            </div>
+          </div>
 
-        {/* 컨트롤 버튼 */}
-        <PracticeControls
-          isPaused={isPaused}
-          isComplete={isComplete}
-          onTogglePause={!isComplete && isStarted ? (isPaused ? resume : pause) : undefined}
-          onRestart={handleRestart}
-          onBack={handleBackToSelect}
-          ttsEnabled={autoListen}
-          onToggleTTS={() => setAutoListen(!autoListen)}
-          translationVisible={showTranslation}
-          onToggleTranslation={() => setShowTranslation(!showTranslation)}
-          className="mt-8"
-        />
+          {/* Word count */}
+          <div className="text-center mb-4">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--color-primary-light)] text-[var(--color-primary)] text-sm">
+              <Trophy className="w-4 h-4" />
+              완료: {sessionStats.totalWords}단어
+            </span>
+          </div>
 
-        {/* 완료 결과 */}
-        {isComplete && (
+          {/* Pause overlay */}
+          {isPaused && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <Card className="p-8 text-center">
+                <Pause className="w-16 h-16 mx-auto mb-4 text-[var(--color-primary)]" />
+                <h2 className="text-2xl font-bold mb-4">일시정지</h2>
+                <Button onClick={togglePause} size="lg">
+                  <Play className="w-5 h-5 mr-2" />
+                  계속하기
+                </Button>
+              </Card>
+            </div>
+          )}
+
+          {/* Typing area */}
+          <Card className="mb-4">
+            <CardContent className="py-8">
+              {/* Target word - Large display */}
+              <div className="typing-text-display text-4xl md:text-5xl mb-4 text-center min-h-[80px] flex items-center justify-center">
+                {feedback.map((item, index) => (
+                  <span
+                    key={index}
+                    className={`${
+                      item.status === 'correct' ? 'text-green-600'
+                      : item.status === 'incorrect' ? 'text-red-500 bg-red-100'
+                      : item.status === 'current' ? 'bg-yellow-300 animate-pulse'
+                      : 'text-gray-400'
+                    }`}
+                  >
+                    {item.char === ' ' ? '\u00A0' : item.char}
+                  </span>
+                ))}
+              </div>
+
+              {/* Translation hint */}
+              {showTranslation && currentMeaning && (
+                <div className="text-center mb-4 text-[var(--color-text-muted)] text-lg">
+                  ({currentMeaning})
+                </div>
+              )}
+
+              {/* Input */}
+              <input
+                ref={inputRef}
+                type="text"
+                value={userInput}
+                onChange={handleInputChange}
+                onCompositionStart={handleCompositionStart}
+                onCompositionEnd={handleCompositionEnd}
+                disabled={isPaused}
+                className="w-full p-4 text-2xl border-2 border-[var(--color-border)] rounded-lg
+                         focus:border-[var(--color-primary)] focus:outline-none
+                         bg-[var(--color-surface)] font-mono text-center"
+                placeholder={!isStarted ? '타이핑을 시작하면 타이머가 시작됩니다' : ''}
+                autoFocus
+              />
+            </CardContent>
+          </Card>
+
+          {/* Controls */}
+          <PracticeControls
+            isPaused={isPaused}
+            isComplete={false}
+            onTogglePause={togglePause}
+            onRestart={handleRestart}
+            ttsEnabled={autoListen}
+            onToggleTTS={() => {
+              setAutoListen(!autoListen);
+              if (!autoListen) speakWord(currentWord);
+            }}
+            translationVisible={showTranslation}
+            onToggleTranslation={() => setShowTranslation(!showTranslation)}
+          />
+        </main>
+      </div>
+    );
+  }
+
+  // Result screen
+  if (viewMode === 'result') {
+    const { accuracy, wpm } = getResults();
+    const isPassed = accuracy >= (currentLevelData?.targetAccuracy || 90);
+
+    return (
+      <div className="min-h-screen bg-[var(--color-background)]">
+        <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={handleBackToLevel}>
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">{language === 'en' ? '🇺🇸' : '🇰🇷'}</span>
+                    <h1 className="text-xl font-bold">단어 연습 결과</h1>
+                  </div>
+                  <p className="text-sm text-[var(--color-text-muted)]">
+                    레벨 {currentLevel}: {currentLevelData?.descriptionKo}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <SettingsDropdown />
+                <UserMenu />
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="container mx-auto px-4 py-8 max-w-2xl">
+          <PracticeResult
+            wpm={wpm}
+            accuracy={accuracy}
+            totalTime={practiceTime}
+            correctCount={sessionStats.totalWords}
+            totalCount={sessionStats.totalCharacters}
+            countLabel="단어"
+            onRestart={handleRestart}
+            showStars
+          />
+
+          {/* Level pass feedback */}
           <Card className={`mt-6 ${isPassed ? 'border-green-500 bg-green-50' : 'border-orange-500 bg-orange-50'}`}>
             <CardContent className="py-6 text-center">
               {isPassed ? (
@@ -395,18 +623,24 @@ export default function WordPracticePage() {
                     레벨 {currentLevel} 통과!
                   </h3>
                   <p className="text-green-600 mb-4">
-                    정확도 {metrics.accuracy}%로 목표({currentLevelData.targetAccuracy}%)를 달성했습니다.
+                    정확도 {accuracy}%로 목표({currentLevelData?.targetAccuracy}%)를 달성했습니다.
                   </p>
                   <div className="flex justify-center gap-4">
                     <Button variant="outline" onClick={handleRestart}>
                       다시 연습
                     </Button>
                     {currentLevel < wordLevels.length ? (
-                      <Button onClick={handleNextLevel} className="bg-green-600 hover:bg-green-700">
+                      <Button
+                        onClick={() => {
+                          setCurrentLevel(currentLevel + 1);
+                          setViewMode('time');
+                        }}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
                         다음 레벨
                       </Button>
                     ) : (
-                      <Button onClick={handleBackToSelect} className="bg-green-600 hover:bg-green-700">
+                      <Button onClick={handleBackToLevel} className="bg-green-600 hover:bg-green-700">
                         레벨 선택
                       </Button>
                     )}
@@ -418,13 +652,13 @@ export default function WordPracticePage() {
                     다시 도전!
                   </h3>
                   <p className="text-orange-600 mb-4">
-                    정확도 {metrics.accuracy}% (목표: {currentLevelData.targetAccuracy}%)
+                    정확도 {accuracy}% (목표: {currentLevelData?.targetAccuracy}%)
                   </p>
                   <div className="flex justify-center gap-4">
                     <Button onClick={handleRestart} className="bg-orange-600 hover:bg-orange-700">
                       다시 연습
                     </Button>
-                    <Button variant="outline" onClick={handleBackToSelect}>
+                    <Button variant="outline" onClick={handleBackToLevel}>
                       레벨 선택
                     </Button>
                   </div>
@@ -432,29 +666,10 @@ export default function WordPracticePage() {
               )}
             </CardContent>
           </Card>
-        )}
+        </main>
+      </div>
+    );
+  }
 
-        {/* 레벨 선택 */}
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold mb-4">레벨 선택</h3>
-          <div className="flex flex-wrap gap-2">
-            {wordLevels.map((level) => (
-              <Button
-                key={level.level}
-                variant={currentLevel === level.level ? 'primary' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  setCurrentLevel(level.level);
-                  reset();
-                  setTimeout(() => inputRef.current?.focus(), 100);
-                }}
-              >
-                Lv.{level.level}
-              </Button>
-            ))}
-          </div>
-        </div>
-      </main>
-    </div>
-  );
+  return null;
 }
