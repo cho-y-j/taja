@@ -149,8 +149,18 @@ export function useTTS(options: UseTTSOptions = {}) {
       resumeIntervalRef.current = null;
     }
 
-    // 현재 재생 중인 것 취소
+    // Chrome speechSynthesis 완전 리셋
     window.speechSynthesis.cancel();
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    // stuck 상태면 여러 번 cancel
+    if (window.speechSynthesis.speaking) {
+      console.log('[TTS] Force reset - was stuck speaking');
+      window.speechSynthesis.cancel();
+      await new Promise(resolve => setTimeout(resolve, 50));
+      window.speechSynthesis.cancel();
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
 
     // Chrome resume 버그 우회 - 주기적으로 resume
     resumeIntervalRef.current = setInterval(() => {
@@ -159,9 +169,6 @@ export function useTTS(options: UseTTSOptions = {}) {
         window.speechSynthesis.resume();
       }
     }, 250);
-
-    // Chrome에서 cancel 후 대기
-    await new Promise(resolve => setTimeout(resolve, 100));
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = targetLang === 'ko' ? 'ko-KR' : 'en-US';
@@ -208,15 +215,49 @@ export function useTTS(options: UseTTSOptions = {}) {
     window.speechSynthesis.speak(utterance);
 
     // 상태 체크
-    console.log('[TTS] After speak() - pending:', window.speechSynthesis.pending, 'speaking:', window.speechSynthesis.speaking);
+    const afterState = {
+      pending: window.speechSynthesis.pending,
+      speaking: window.speechSynthesis.speaking,
+      paused: window.speechSynthesis.paused
+    };
+    console.log('[TTS] After speak():', afterState);
 
-    // Chrome 추가 우회 - 100ms 후에도 pending이면 다시 시도
-    setTimeout(() => {
-      if (window.speechSynthesis && !window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
-        console.log('[TTS] Retry speak...');
-        window.speechSynthesis.speak(utterance);
-      }
-    }, 200);
+    // Chrome 버그: speaking=true but pending=false 이고 onstart 안 불림
+    // 이 경우 speechSynthesis가 stuck 상태임
+    if (afterState.speaking && !afterState.pending) {
+      console.log('[TTS] Detected stuck state, forcing reset...');
+
+      // 완전 리셋 후 재시도
+      setTimeout(async () => {
+        window.speechSynthesis.cancel();
+        await new Promise(r => setTimeout(r, 100));
+
+        // 새 utterance 생성 (기존 것 재사용하면 안됨)
+        const newUtterance = new SpeechSynthesisUtterance(text);
+        newUtterance.lang = utterance.lang;
+        newUtterance.rate = utterance.rate;
+        newUtterance.volume = utterance.volume;
+        if (voice) newUtterance.voice = voice;
+
+        newUtterance.onstart = () => {
+          console.log('[TTS] Started (retry)');
+          setIsSpeaking(true);
+        };
+        newUtterance.onend = () => {
+          console.log('[TTS] Ended (retry)');
+          setIsSpeaking(false);
+        };
+        newUtterance.onerror = (e) => {
+          if (e.error !== 'interrupted' && e.error !== 'canceled') {
+            console.error('[TTS] Error (retry):', e.error);
+          }
+          setIsSpeaking(false);
+        };
+
+        window.speechSynthesis.speak(newUtterance);
+        console.log('[TTS] Retry result - pending:', window.speechSynthesis.pending, 'speaking:', window.speechSynthesis.speaking);
+      }, 200);
+    }
 
   }, [language, ttsEnabled, ttsVolume, getTTSRate, getPreferredVoice]);
 
