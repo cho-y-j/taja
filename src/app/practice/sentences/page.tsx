@@ -98,12 +98,16 @@ export default function SentencePracticePage() {
     }
   }, [language]);
 
+  // speakSentence를 ref로 저장 (의존성 배열 문제 방지)
+  const speakSentenceRef = useRef(speakSentence);
+  speakSentenceRef.current = speakSentence;
+
   // 자동 읽기 - 문장이 바뀌면 읽기
   useEffect(() => {
     if (autoListen && currentText && viewMode === 'practice') {
-      speakSentence(currentText);
+      speakSentenceRef.current(currentText);
     }
-  }, [autoListen, currentText, viewMode, speakSentence]);
+  }, [autoListen, currentText, viewMode]);
 
   // 카테고리 선택
   const handleCategorySelect = useCallback((categoryId: string) => {
