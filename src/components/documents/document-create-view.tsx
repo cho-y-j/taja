@@ -415,41 +415,94 @@ export function DocumentCreateView() {
             ) : (
               // 파일 처리 옵션 UI
               <div className="space-y-4">
-                <div className="p-4 bg-[var(--color-background)] rounded-lg">
-                  <p className="font-medium text-[var(--color-text)]">{pendingFileContent.name}</p>
-                  <p className="text-sm text-[var(--color-text-muted)]">
-                    {pendingFileContent.content.length.toLocaleString()}자
-                  </p>
+                {/* 파일 정보 */}
+                <div className="p-4 bg-[var(--color-background)] rounded-lg border border-[var(--color-border)]">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-[var(--color-text)]">{pendingFileContent.name}</p>
+                      <p className="text-sm text-[var(--color-text-muted)]">
+                        {pendingFileContent.content.length.toLocaleString()}자
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setPendingFileContent(null);
+                        setUploadInstruction('');
+                      }}
+                      disabled={isUploading}
+                    >
+                      다른 파일
+                    </Button>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-[var(--color-text)]">
-                    AI 지시사항 (선택)
-                  </label>
-                  <textarea
-                    value={uploadInstruction}
-                    onChange={(e) => setUploadInstruction(e.target.value)}
-                    placeholder="예: 이 논문을 요약하고 핵심 단어와 문장을 추출해줘"
-                    rows={3}
-                    className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] text-sm"
-                  />
-                  <p className="text-xs text-[var(--color-text-muted)] mt-1">
-                    지시사항 없이 AI 처리하면 기본 단어/문장 추출
-                  </p>
+                {/* AI 지시사항 */}
+                <div className="p-4 bg-gradient-to-br from-[var(--color-primary)]/5 to-[var(--color-secondary)]/5 rounded-xl border border-[var(--color-primary)]/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Bot className="w-5 h-5 text-[var(--color-primary)]" />
+                    <span className="font-semibold text-[var(--color-text)]">AI 학습 자료 생성</span>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium mb-2 text-[var(--color-text)]">
+                      지시사항 (선택)
+                    </label>
+                    <textarea
+                      value={uploadInstruction}
+                      onChange={(e) => setUploadInstruction(e.target.value)}
+                      placeholder="원하는 방식으로 정리해달라고 요청하세요..."
+                      rows={2}
+                      className="w-full px-4 py-3 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] text-sm"
+                    />
+                  </div>
+
+                  {/* 예시 지시사항 버튼들 */}
+                  <div className="mb-4">
+                    <p className="text-xs text-[var(--color-text-muted)] mb-2">예시 (클릭하여 적용):</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        '핵심 단어와 예문만 추출해줘',
+                        '어려운 단어 위주로 정리해줘',
+                        '문서를 요약하고 주요 문장 뽑아줘',
+                        '초급자용으로 쉬운 표현만 골라줘',
+                      ].map((example) => (
+                        <button
+                          key={example}
+                          type="button"
+                          onClick={() => setUploadInstruction(example)}
+                          className="px-3 py-1.5 text-xs bg-[var(--color-surface)] border border-[var(--color-border)] rounded-full hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
+                        >
+                          {example}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 기본 동작 안내 */}
+                  <div className="p-3 bg-[var(--color-surface)] rounded-lg text-sm">
+                    <p className="text-[var(--color-text-muted)]">
+                      <span className="font-medium text-[var(--color-text)]">지시사항 없이 실행하면:</span>{' '}
+                      문서에서 중요 단어 10~15개와 핵심 문장 8~12개를 자동 추출하고, 해석(번역)을 함께 생성합니다.
+                    </p>
+                  </div>
                 </div>
 
+                {/* 버튼들 */}
                 <div className="flex gap-2">
                   <Button
                     onClick={handleProcessFileWithAi}
                     disabled={isUploading}
                     className="flex-1"
+                    size="lg"
                   >
                     {isUploading ? (
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
                     ) : (
                       <Bot className="w-4 h-4 mr-2" />
                     )}
-                    AI로 정리
+                    {uploadInstruction.trim() ? 'AI로 맞춤 정리' : 'AI로 학습자료 만들기'}
                   </Button>
                   <Button
                     variant="outline"
@@ -457,16 +510,6 @@ export function DocumentCreateView() {
                     disabled={isUploading}
                   >
                     원본 그대로
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setPendingFileContent(null);
-                      setUploadInstruction('');
-                    }}
-                    disabled={isUploading}
-                  >
-                    취소
                   </Button>
                 </div>
               </div>
@@ -534,12 +577,29 @@ export function DocumentCreateView() {
                 <textarea
                   value={urlInstruction}
                   onChange={(e) => setUrlInstruction(e.target.value)}
-                  placeholder="예: 이 영상에서 나오는 프로그래밍 관련 단어와 예문을 정리해줘"
+                  placeholder="원하는 방식으로 정리해달라고 요청하세요..."
                   rows={2}
                   className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] text-sm"
                 />
-                <p className="text-xs text-[var(--color-text-muted)] mt-1">
-                  지시사항 없으면 기본 단어/문장 추출
+                {/* 예시 지시사항 */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {[
+                    '핵심 단어만 추출해줘',
+                    '주요 문장 위주로 정리해줘',
+                    '초급자용으로 쉽게',
+                  ].map((example) => (
+                    <button
+                      key={example}
+                      type="button"
+                      onClick={() => setUrlInstruction(example)}
+                      className="px-2 py-1 text-xs bg-[var(--color-surface)] border border-[var(--color-border)] rounded-full hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
+                    >
+                      {example}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-[var(--color-text-muted)] mt-2">
+                  지시사항 없으면 단어 10~15개, 문장 8~12개를 자동 추출 + 번역
                 </p>
               </div>
 
