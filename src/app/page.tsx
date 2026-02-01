@@ -174,7 +174,7 @@ export default function LandingPage() {
             {/* CTA 버튼 */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
-                href={isSignedIn ? '/learn' : '/sign-up'}
+                href="/learn"
                 className="group px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-purple-500/25 transition-all hover:-translate-y-0.5"
               >
                 <span className="flex items-center gap-2">
@@ -314,7 +314,7 @@ export default function LandingPage() {
                 ))}
               </ul>
               <Link
-                href="/sign-up"
+                href="/learn"
                 className="block w-full py-3 text-center bg-[var(--color-background)] text-[var(--color-text)] font-medium rounded-xl border border-[var(--color-border)] hover:border-[var(--color-primary)] transition-colors"
               >
                 무료로 시작
@@ -409,10 +409,10 @@ export default function LandingPage() {
                 가입하고 200 무료 크레딧을 받아 AI 기능을 체험해보세요.
               </p>
               <Link
-                href={isSignedIn ? '/learn' : '/sign-up'}
+                href="/learn"
                 className="inline-flex items-center gap-2 px-8 py-4 bg-white text-purple-600 font-semibold rounded-xl hover:bg-white/90 transition-colors"
               >
-                {isSignedIn ? '연습하러 가기' : '무료로 시작하기'}
+                무료로 시작하기
                 <ChevronRight className="w-5 h-5" />
               </Link>
             </div>
