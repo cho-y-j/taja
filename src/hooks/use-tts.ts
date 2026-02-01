@@ -7,41 +7,133 @@ interface UseTTSOptions {
   language?: 'ko' | 'en';
 }
 
-// Chrome TTS 초기화 상태
-let isChromeTTSInitialized = false;
+// Chrome TTS 초기화 상태 (전역)
+let ttsInitPromise: Promise<void> | null = null;
+let isTTSReady = false;
 
-// Chrome TTS 초기화 (첫 사용자 상호작용 시 호출)
-function initChromeTTS() {
-  if (isChromeTTSInitialized) return;
+// Chrome에서 TTS 초기화 (반드시 사용자 상호작용 후 호출)
+async function initChromeTTS(): Promise<void> {
+  if (isTTSReady) return;
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
 
-  // 빈 utterance로 TTS 엔진 "워밍업"
-  const warmup = new SpeechSynthesisUtterance('');
-  warmup.volume = 0;
-  window.speechSynthesis.speak(warmup);
-  window.speechSynthesis.cancel();
-  isChromeTTSInitialized = true;
-}
+  // 이미 초기화 중이면 기다림
+  if (ttsInitPromise) {
+    return ttsInitPromise;
+  }
 
-// 페이지 로드 시 클릭 이벤트에서 초기화
-if (typeof window !== 'undefined') {
-  const initOnInteraction = () => {
-    initChromeTTS();
-    document.removeEventListener('click', initOnInteraction);
-    document.removeEventListener('keydown', initOnInteraction);
-  };
-  document.addEventListener('click', initOnInteraction);
-  document.addEventListener('keydown', initOnInteraction);
+  ttsInitPromise = new Promise<void>((resolve) => {
+    // Chrome은 voices가 비동기로 로드됨 - 먼저 로드 대기
+    const checkVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        // 워밍업 utterance 실행
+        const warmup = new SpeechSynthesisUtterance(' '); // 공백 하나 (빈 문자열은 무시됨)
+        warmup.volume = 0.01; // 거의 안들리게
+        warmup.rate = 10; // 빠르게 끝나도록
+
+        warmup.onend = () => {
+          isTTSReady = true;
+          resolve();
+        };
+
+        warmup.onerror = () => {
+          // 에러 발생해도 초기화된 것으로 처리
+          isTTSReady = true;
+          resolve();
+        };
+
+        // 타임아웃 설정 (워밍업이 끝나지 않을 경우 대비)
+        setTimeout(() => {
+          if (!isTTSReady) {
+            isTTSReady = true;
+            resolve();
+          }
+        }, 500);
+
+        window.speechSynthesis.speak(warmup);
+      } else {
+        // voices가 아직 없으면 다시 시도
+        setTimeout(checkVoices, 50);
+      }
+    };
+
+    // Chrome voiceschanged 이벤트 등록
+    const onVoicesChanged = () => {
+      checkVoices();
+      window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
+    };
+
+    // 먼저 즉시 체크
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      checkVoices();
+    } else {
+      // Chrome: voiceschanged 이벤트 대기
+      window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged);
+      // 폴백: 타임아웃 후 강제 진행
+      setTimeout(() => {
+        isTTSReady = true;
+        resolve();
+      }, 1000);
+    }
+  });
+
+  return ttsInitPromise;
 }
 
 export function useTTS(options: UseTTSOptions = {}) {
   const { language = 'ko' } = options;
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [isReady, setIsReady] = useState(false);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const resumeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const speakQueueRef = useRef<Array<{ text: string; lang: 'ko' | 'en' }>>([]);
 
   const { ttsEnabled, voiceGender, ttsVolume, getTTSRate } = useSettingsStore();
+
+  // 사용자 상호작용 시 TTS 초기화
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    let mounted = true;
+
+    const handleInteraction = async () => {
+      await initChromeTTS();
+      if (mounted) {
+        setIsReady(true);
+        // 대기 중인 speak 요청 처리
+        if (speakQueueRef.current.length > 0) {
+          const queued = speakQueueRef.current.shift();
+          if (queued) {
+            // 약간 지연 후 재생 (상태 업데이트 반영 대기)
+            setTimeout(() => {
+              speakInternal(queued.text, queued.lang);
+            }, 100);
+          }
+        }
+      }
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('keydown', handleInteraction);
+      document.removeEventListener('touchstart', handleInteraction);
+    };
+
+    // 이미 초기화되었으면 바로 ready
+    if (isTTSReady) {
+      setIsReady(true);
+    } else {
+      document.addEventListener('click', handleInteraction);
+      document.addEventListener('keydown', handleInteraction);
+      document.addEventListener('touchstart', handleInteraction);
+    }
+
+    return () => {
+      mounted = false;
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('keydown', handleInteraction);
+      document.removeEventListener('touchstart', handleInteraction);
+    };
+  }, []);
 
   // 음성 목록 로드
   useEffect(() => {
@@ -60,12 +152,16 @@ export function useTTS(options: UseTTSOptions = {}) {
     // Chrome에서는 voiceschanged 이벤트 후에 voices가 로드됨
     window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
 
-    // 폴백: 200ms 후 다시 시도
-    const fallbackTimer = setTimeout(loadVoices, 200);
+    // 폴백: 여러 번 시도
+    const timers = [
+      setTimeout(loadVoices, 100),
+      setTimeout(loadVoices, 300),
+      setTimeout(loadVoices, 500),
+    ];
 
     return () => {
       window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
-      clearTimeout(fallbackTimer);
+      timers.forEach(clearTimeout);
       if (resumeIntervalRef.current) {
         clearInterval(resumeIntervalRef.current);
       }
@@ -113,15 +209,9 @@ export function useTTS(options: UseTTSOptions = {}) {
     }
   }, [voices, voiceGender]);
 
-  // 음성 재생
-  const speak = useCallback((text: string, langOverride?: 'ko' | 'en') => {
-    if (!text || typeof window === 'undefined' || !window.speechSynthesis) return;
-    if (!ttsEnabled) return;
-
-    // Chrome TTS 초기화 확인
-    initChromeTTS();
-
-    const targetLang = langOverride || language;
+  // 내부 speak 함수 (이미 초기화된 상태에서만 호출)
+  const speakInternal = useCallback((text: string, targetLang: 'ko' | 'en') => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
 
     // 이전 interval 정리
     if (resumeIntervalRef.current) {
@@ -147,7 +237,7 @@ export function useTTS(options: UseTTSOptions = {}) {
       }
     }, 100);
 
-    // 지연 후 speak (Chrome에서 cancel 후 바로 speak하면 작동 안함)
+    // Chrome에서 cancel 후 100ms 대기 필요
     setTimeout(() => {
       if (typeof window === 'undefined' || !window.speechSynthesis) return;
 
@@ -173,7 +263,7 @@ export function useTTS(options: UseTTSOptions = {}) {
       utterance.onerror = (e) => {
         // interrupted는 cancel() 호출 시 발생하므로 무시
         if (e.error !== 'interrupted' && e.error !== 'canceled') {
-          console.warn('TTS error:', e.error);
+          console.warn('TTS error:', e.error, e);
         }
         setIsSpeaking(false);
         if (resumeIntervalRef.current) {
@@ -184,11 +274,35 @@ export function useTTS(options: UseTTSOptions = {}) {
 
       utteranceRef.current = utterance;
 
-      // Chrome resume 버그 우회
+      // Chrome resume 버그 우회 - 먼저 resume 호출
       window.speechSynthesis.resume();
       window.speechSynthesis.speak(utterance);
-    }, 50);
-  }, [language, ttsEnabled, ttsVolume, getTTSRate, getPreferredVoice]);
+    }, 100); // Chrome은 100ms 이상 대기 필요
+  }, [getTTSRate, ttsVolume, getPreferredVoice]);
+
+  // 음성 재생 (외부에서 호출)
+  const speak = useCallback((text: string, langOverride?: 'ko' | 'en') => {
+    if (!text || typeof window === 'undefined' || !window.speechSynthesis) return;
+    if (!ttsEnabled) return;
+
+    const targetLang = langOverride || language;
+
+    // 아직 초기화되지 않았으면 큐에 추가하고 초기화 시도
+    if (!isReady && !isTTSReady) {
+      speakQueueRef.current.push({ text, lang: targetLang });
+      // 강제로 초기화 시도 (사용자 상호작용 가정)
+      initChromeTTS().then(() => {
+        setIsReady(true);
+        const queued = speakQueueRef.current.shift();
+        if (queued) {
+          setTimeout(() => speakInternal(queued.text, queued.lang), 100);
+        }
+      });
+      return;
+    }
+
+    speakInternal(text, targetLang);
+  }, [language, ttsEnabled, isReady, speakInternal]);
 
   // 음성 정지
   const stop = useCallback(() => {
@@ -221,6 +335,7 @@ export function useTTS(options: UseTTSOptions = {}) {
     stop,
     isSpeaking,
     isSupported,
+    isReady,
     voices,
     ttsEnabled,
   };

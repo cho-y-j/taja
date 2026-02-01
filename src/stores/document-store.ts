@@ -14,6 +14,19 @@ export interface StructuredContent {
   }>;
 }
 
+// DB에서 가져온 문서 타입 (API 응답)
+interface DBDocument {
+  id: string;
+  userId: string;
+  title: string;
+  originalText: string | null;
+  summary: string | null;
+  structured: StructuredContent | null;
+  locale: string | null;
+  source: string | null;
+  createdAt: string;
+}
+
 export interface UserDocument {
   id: string;
   name: string;
@@ -45,6 +58,11 @@ export type CreateSource = 'manual' | 'upload' | 'ai' | 'url';
 interface DocumentState {
   // Persisted
   documents: UserDocument[];
+
+  // Sync state
+  isSyncing: boolean;
+  lastSyncedAt: string | null;
+  syncError: string | null;
 
   // UI state
   viewMode: ViewMode;
@@ -99,6 +117,10 @@ interface DocumentActions {
   backToDetail: () => void;
 
   getSelectedDocument: () => UserDocument | null;
+
+  // DB 동기화
+  syncFromDB: () => Promise<void>;
+  setDocuments: (docs: UserDocument[]) => void;
 }
 
 // Migrate old localStorage data
@@ -129,6 +151,9 @@ function migrateOldDocuments(): UserDocument[] {
 
 const initialState: DocumentState = {
   documents: [],
+  isSyncing: false,
+  lastSyncedAt: null,
+  syncError: null,
   viewMode: 'list',
   createSource: null,
   selectedDocumentId: null,
@@ -142,6 +167,21 @@ const initialState: DocumentState = {
   isGenerating: false,
   generationError: null,
 };
+
+// DB 문서를 로컬 형식으로 변환
+function convertDBDocToLocal(dbDoc: DBDocument): UserDocument {
+  return {
+    id: dbDoc.id,
+    name: dbDoc.title,
+    content: dbDoc.originalText || '',
+    language: (dbDoc.locale === 'en' ? 'en' : 'ko') as 'en' | 'ko',
+    source: (dbDoc.source || 'manual') as 'manual' | 'upload' | 'ai' | 'url',
+    structured: dbDoc.structured || undefined,
+    summary: dbDoc.summary || undefined,
+    createdAt: dbDoc.createdAt,
+    updatedAt: dbDoc.createdAt,
+  };
+}
 
 export const useDocumentStore = create<DocumentState & DocumentActions>()(
   persist(
@@ -289,6 +329,44 @@ export const useDocumentStore = create<DocumentState & DocumentActions>()(
           state.documents.find((d) => d.id === state.selectedDocumentId) || null
         );
       },
+
+      // DB 동기화 - 서버에서 문서 가져오기
+      syncFromDB: async () => {
+        set({ isSyncing: true, syncError: null });
+        try {
+          const res = await fetch('/api/user/documents');
+          if (!res.ok) {
+            throw new Error('Failed to fetch documents');
+          }
+          const data = await res.json();
+          const dbDocs: DBDocument[] = data.documents || [];
+
+          // DB 문서를 로컬 형식으로 변환
+          const localDocs = dbDocs.map(convertDBDocToLocal);
+
+          // 기존 로컬 문서와 병합 (DB 문서 우선, 로컬만 있는 것은 유지)
+          const state = get();
+          const dbDocIds = new Set(localDocs.map(d => d.id));
+          const localOnlyDocs = state.documents.filter(d => !dbDocIds.has(d.id));
+
+          // DB 문서 + 로컬만 있는 문서 (DB에 없는 것)
+          const mergedDocs = [...localDocs, ...localOnlyDocs];
+
+          set({
+            documents: mergedDocs,
+            isSyncing: false,
+            lastSyncedAt: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.error('Sync error:', error);
+          set({
+            isSyncing: false,
+            syncError: error instanceof Error ? error.message : 'Sync failed',
+          });
+        }
+      },
+
+      setDocuments: (docs) => set({ documents: docs }),
     }),
     {
       name: 'lit-type-documents-v2',

@@ -235,6 +235,8 @@ export function DocumentCreateView() {
               title: draftName,
               originalText: draftContent,
               locale: draftLanguage,
+              source: createSource || 'manual',
+              structured: structuredContent || undefined,
             }),
           });
         }

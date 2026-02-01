@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, originalText, summary, locale } = body;
+    const { title, originalText, summary, locale, structured, source } = body;
 
     if (!title) {
       return NextResponse.json(
@@ -78,6 +78,8 @@ export async function POST(request: NextRequest) {
         title,
         originalText,
         summary,
+        structured: structured || null,
+        source: source || 'manual',
         locale: locale || 'ko',
       })
       .returning();
@@ -102,7 +104,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, title, originalText, summary } = body;
+    const { id, title, originalText, summary, structured } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -140,6 +142,7 @@ export async function PUT(request: NextRequest) {
         title: title ?? existingDoc[0].title,
         originalText: originalText ?? existingDoc[0].originalText,
         summary: summary ?? existingDoc[0].summary,
+        structured: structured !== undefined ? structured : existingDoc[0].structured,
       })
       .where(eq(documents.id, id))
       .returning();

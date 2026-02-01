@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, real, boolean, serial } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, integer, real, boolean, serial, jsonb } from 'drizzle-orm/pg-core';
 
 // 사용자 테이블
 export const users = pgTable('users', {
@@ -27,6 +27,19 @@ export const practiceSessions = pgTable('practice_sessions', {
   completedAt: timestamp('completed_at').defaultNow(),
 });
 
+// 구조화된 학습 데이터 타입
+export interface StructuredContent {
+  words: Array<{
+    word: string;
+    meaning: string;
+    example: string;
+  }>;
+  sentences: Array<{
+    original: string;
+    translation: string;
+  }>;
+}
+
 // 문서 테이블
 export const documents = pgTable('documents', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -34,9 +47,11 @@ export const documents = pgTable('documents', {
   title: text('title').notNull(),
   originalText: text('original_text'),
   summary: text('summary'),
+  structured: jsonb('structured').$type<StructuredContent>(), // 단어/문장 + 번역 데이터
   fileUrl: text('file_url'),
   fileType: text('file_type'), // 'pdf', 'txt', 'docx'
   locale: text('locale').default('ko'),
+  source: text('source').default('manual'), // 'manual', 'upload', 'ai', 'url'
   createdAt: timestamp('created_at').defaultNow(),
 });
 
