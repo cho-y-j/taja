@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   BookOpen,
@@ -19,8 +18,7 @@ const CLERK_CONFIGURED = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
   process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.startsWith('pk_');
 
 export default function LearnPage() {
-  const router = useRouter();
-  const { language, clearLanguage, toggleMode } = useThemeStore();
+  const { language, clearLanguage } = useThemeStore();
   const [isSignedIn, setIsSignedIn] = useState(false);
 
   // Clerk가 설정된 경우에만 로그인 상태 확인
@@ -43,22 +41,35 @@ export default function LearnPage() {
     }
   }, []);
 
-  // 언어가 선택되지 않았다면 홈으로 리다이렉트
-  useEffect(() => {
-    if (!language) {
-      router.push('/');
-    }
-  }, [language, router]);
-
   const handleChangeLanguage = () => {
     clearLanguage();
-    router.push('/');
   };
 
+  // 언어가 선택되지 않았다면 언어 선택 화면 표시
   if (!language) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)]">
-        <div className="spinner" />
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-[var(--color-text)] mb-6">
+            어떤 언어를 연습할까요?
+          </h1>
+          <div className="flex gap-4 justify-center">
+            <button
+              onClick={() => useThemeStore.getState().setLanguage('ko')}
+              className="px-8 py-4 bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] hover:border-[var(--color-primary)] transition-all"
+            >
+              <span className="text-3xl mb-2 block">🇰🇷</span>
+              <span className="text-lg font-medium text-[var(--color-text)]">한글</span>
+            </button>
+            <button
+              onClick={() => useThemeStore.getState().setLanguage('en')}
+              className="px-8 py-4 bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] hover:border-[var(--color-primary)] transition-all"
+            >
+              <span className="text-3xl mb-2 block">🇺🇸</span>
+              <span className="text-lg font-medium text-[var(--color-text)]">English</span>
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
