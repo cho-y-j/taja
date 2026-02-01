@@ -333,6 +333,12 @@ export const useDocumentStore = create<DocumentState & DocumentActions>()(
 
       // DB 동기화 - 서버에서 문서 가져오기
       syncFromDB: async () => {
+        const currentState = get();
+        if (currentState.isSyncing) {
+          console.log('[Sync] Already syncing, skip');
+          return;
+        }
+
         set({ isSyncing: true, syncError: null });
         try {
           const res = await fetch('/api/user/documents');
@@ -341,17 +347,32 @@ export const useDocumentStore = create<DocumentState & DocumentActions>()(
           }
           const data = await res.json();
           const dbDocs: DBDocument[] = data.documents || [];
+          console.log('[Sync] DB documents:', dbDocs.length);
 
           // DB 문서를 로컬 형식으로 변환
-          const localDocs = dbDocs.map(convertDBDocToLocal);
+          const convertedDbDocs = dbDocs.map(convertDBDocToLocal);
 
-          // 기존 로컬 문서와 병합 (DB 문서 우선, 로컬만 있는 것은 유지)
-          const state = get();
-          const dbDocIds = new Set(localDocs.map(d => d.id));
-          const localOnlyDocs = state.documents.filter(d => !dbDocIds.has(d.id));
+          // 기존 로컬 문서
+          const existingDocs = get().documents;
+          console.log('[Sync] Existing local docs:', existingDocs.length);
 
-          // DB 문서 + 로컬만 있는 문서 (DB에 없는 것)
-          const mergedDocs = [...localDocs, ...localOnlyDocs];
+          // DB에 없는 로컬 문서만 유지 (ID 또는 제목+내용으로 비교)
+          const dbDocIds = new Set(convertedDbDocs.map(d => d.id));
+          const localOnlyDocs = existingDocs.filter(d => {
+            // DB ID와 일치하면 제외 (DB에 있음)
+            if (dbDocIds.has(d.id)) return false;
+            // 같은 제목+내용의 문서가 DB에 있으면 제외 (중복)
+            const duplicate = convertedDbDocs.some(
+              dbDoc => dbDoc.name === d.name && dbDoc.content === d.content
+            );
+            return !duplicate;
+          });
+
+          console.log('[Sync] Local only docs:', localOnlyDocs.length);
+
+          // DB 문서 + 로컬만 있는 문서
+          const mergedDocs = [...convertedDbDocs, ...localOnlyDocs];
+          console.log('[Sync] Merged total:', mergedDocs.length);
 
           set({
             documents: mergedDocs,
@@ -359,7 +380,7 @@ export const useDocumentStore = create<DocumentState & DocumentActions>()(
             lastSyncedAt: new Date().toISOString(),
           });
         } catch (error) {
-          console.error('Sync error:', error);
+          console.error('[Sync] Error:', error);
           set({
             isSyncing: false,
             syncError: error instanceof Error ? error.message : 'Sync failed',

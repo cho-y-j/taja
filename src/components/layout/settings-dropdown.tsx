@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Settings, Volume2, VolumeX, Keyboard, Mic } from 'lucide-react';
+import { Settings, Volume2, VolumeX, Keyboard, Mic, Play } from 'lucide-react';
 import { useSettingsStore, VoiceGender, TTSSpeed } from '@/stores/settings-store';
+import { useTTS } from '@/hooks/use-tts';
 
 export function SettingsDropdown() {
   const [isOpen, setIsOpen] = useState(false);
@@ -20,6 +21,13 @@ export function SettingsDropdown() {
     setTTSSpeed,
     setTTSVolume,
   } = useSettingsStore();
+
+  const { speak, isSpeaking, voices } = useTTS({ language: 'ko' });
+
+  const handleTestTTS = () => {
+    console.log('[Settings] Testing TTS, voices available:', voices.length);
+    speak('안녕하세요, 음성 테스트입니다.');
+  };
 
   return (
     <div className="relative">
@@ -180,6 +188,19 @@ export function SettingsDropdown() {
                     className="w-24 accent-[var(--color-primary)]"
                   />
                 </div>
+
+                {/* 음성 테스트 */}
+                <button
+                  onClick={handleTestTTS}
+                  disabled={isSpeaking || !ttsEnabled}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Play className="w-4 h-4" />
+                  {isSpeaking ? '재생 중...' : '음성 테스트'}
+                </button>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  사용 가능한 음성: {voices.length}개
+                </p>
               </div>
             </div>
           </div>
