@@ -112,18 +112,23 @@ export function WordPracticeMode({ document: doc }: Props) {
     };
   }, []);
 
-  // Speak word
+  // Speak word (Chrome 버그 우회 포함)
   const speakWord = useCallback((word: string) => {
     if (!word || typeof window === 'undefined' || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(word);
-    utterance.lang = doc.language === 'ko' ? 'ko-KR' : 'en-US';
-    const voice = getPreferredVoice(voices, doc.language);
-    if (voice) utterance.voice = voice;
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utterance);
+
+    setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(word);
+      utterance.lang = doc.language === 'ko' ? 'ko-KR' : 'en-US';
+      const voice = getPreferredVoice(voices, doc.language);
+      if (voice) utterance.voice = voice;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(utterance);
+    }, 50);
   }, [doc.language, voices]);
 
   // Initialize words

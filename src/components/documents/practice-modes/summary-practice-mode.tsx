@@ -86,18 +86,23 @@ export function SummaryPracticeMode({ document: doc }: Props) {
     };
   }, []);
 
-  // Speak summary
+  // Speak summary (Chrome 버그 우회 포함)
   const speakSummary = useCallback((text: string) => {
     if (!text || typeof window === 'undefined' || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = doc.language === 'ko' ? 'ko-KR' : 'en-US';
-    const voice = getPreferredVoice(voices, doc.language);
-    if (voice) utterance.voice = voice;
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utterance);
+
+    setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = doc.language === 'ko' ? 'ko-KR' : 'en-US';
+      const voice = getPreferredVoice(voices, doc.language);
+      if (voice) utterance.voice = voice;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(utterance);
+    }, 50);
   }, [doc.language, voices]);
 
   // Generate summary

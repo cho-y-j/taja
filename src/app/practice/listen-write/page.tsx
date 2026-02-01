@@ -161,27 +161,33 @@ export default function ListenWritePracticePage() {
     }
   }, [voices]);
 
-  // Speak the sentence
+  // Speak the sentence (Chrome 버그 우회 포함)
   const speakSentence = useCallback(() => {
     if (!currentSentence || !speechSupported || typeof window === 'undefined') return;
 
+    // Chrome 버그 우회: cancel 후 resume 필요
     window.speechSynthesis.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(currentSentence.text);
-    utterance.lang = language === 'ko' ? 'ko-KR' : 'en-US';
-    utterance.rate = difficultyInfo[difficulty].speed;
+    setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(currentSentence.text);
+      utterance.lang = language === 'ko' ? 'ko-KR' : 'en-US';
+      utterance.rate = difficultyInfo[difficulty].speed;
 
-    const voice = getPreferredVoice(language);
-    if (voice) {
-      utterance.voice = voice;
-    }
+      const voice = getPreferredVoice(language);
+      if (voice) {
+        utterance.voice = voice;
+      }
 
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
 
-    speechRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
+      speechRef.current = utterance;
+
+      // Chrome resume 버그 우회
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(utterance);
+    }, 50);
   }, [currentSentence, language, difficulty, speechSupported, getPreferredVoice]);
 
   // Stop speaking
