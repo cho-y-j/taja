@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { SettingsDropdown, UserMenu } from '@/components/layout';
 import { useThemeStore } from '@/stores/theme-store';
 import { useTTS } from '@/hooks/use-tts';
 import {
@@ -369,16 +370,22 @@ export default function SentencePracticePage() {
       <div className="min-h-screen bg-[var(--color-background)]">
         <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
           <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center gap-4">
-              <Link href="/learn/basic">
-                <Button variant="ghost" size="icon">
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-              </Link>
-              <h1 className="text-xl font-bold">문장 연습</h1>
-              <span className="ml-auto text-sm bg-[var(--color-primary)] text-white px-3 py-1 rounded-full">
-                {language === 'en' ? '🇺🇸 영문' : '🇰🇷 한글'}
-              </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Link href="/learn/basic">
+                  <Button variant="ghost" size="icon">
+                    <ArrowLeft className="w-5 h-5" />
+                  </Button>
+                </Link>
+                <h1 className="text-xl font-bold">문장 연습</h1>
+                <span className="text-sm bg-[var(--color-primary)] text-white px-3 py-1 rounded-full">
+                  {language === 'en' ? '🇺🇸 영문' : '🇰🇷 한글'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <SettingsDropdown />
+                <UserMenu />
+              </div>
             </div>
           </div>
         </header>
@@ -435,11 +442,17 @@ export default function SentencePracticePage() {
       <div className="min-h-screen bg-[var(--color-background)]">
         <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
           <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => setViewMode('category')}>
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <h1 className="text-xl font-bold">연습 시간 선택</h1>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={() => setViewMode('category')}>
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <h1 className="text-xl font-bold">연습 시간 선택</h1>
+              </div>
+              <div className="flex items-center gap-2">
+                <SettingsDropdown />
+                <UserMenu />
+              </div>
             </div>
           </div>
         </header>
@@ -492,11 +505,13 @@ export default function SentencePracticePage() {
                 </Button>
                 <h1 className="text-xl font-bold">문장 연습</h1>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
                 {/* 일시정지 */}
                 <Button variant="outline" size="icon" onClick={togglePause}>
                   {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
                 </Button>
+                <SettingsDropdown />
+                <UserMenu />
               </div>
             </div>
           </div>
@@ -599,7 +614,7 @@ export default function SentencePracticePage() {
             onTogglePause={togglePause}
             onRestart={handleRestart}
             ttsEnabled={autoListen}
-            onToggleTTS={() => { setAutoListen(!autoListen); if (!autoListen && currentText) speakSentence(currentText); }}
+            onToggleTTS={() => setAutoListen(!autoListen)}
             translationVisible={showTranslation}
             onToggleTranslation={() => setShowTranslation(!showTranslation)}
           />

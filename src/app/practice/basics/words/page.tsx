@@ -8,6 +8,7 @@ import { PracticeControls } from '@/components/practice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { MetricsDisplay } from '@/components/typing/metrics-display';
+import { SettingsDropdown, UserMenu } from '@/components/layout';
 import { useTypingEngine } from '@/hooks/use-typing-engine';
 import { useTTS } from '@/hooks/use-tts';
 import { wordLevels, getRandomWordsWithMeaning, type WordWithMeaning } from '@/lib/typing/word-practice';
@@ -208,10 +209,14 @@ export default function WordPracticePage() {
                 </Link>
                 <h1 className="text-xl font-bold">단어 연습</h1>
               </div>
-              <Button variant="outline" size="sm" onClick={toggleLanguage}>
-                <Globe className="w-4 h-4 mr-2" />
-                {language === 'en' ? '한글로 전환' : 'English'}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={toggleLanguage}>
+                  <Globe className="w-4 h-4 mr-2" />
+                  {language === 'en' ? '한글로 전환' : 'English'}
+                </Button>
+                <SettingsDropdown />
+                <UserMenu />
+              </div>
             </div>
           </div>
         </header>
@@ -291,6 +296,8 @@ export default function WordPracticePage() {
                 <Globe className="w-4 h-4 mr-2" />
                 {language === 'en' ? '한글' : 'EN'}
               </Button>
+              <SettingsDropdown />
+              <UserMenu />
               <Button variant="ghost" size="sm" onClick={handleExit}>
                 <X className="w-4 h-4 mr-2" />
                 종료
@@ -372,7 +379,7 @@ export default function WordPracticePage() {
           onRestart={handleRestart}
           onBack={handleBackToSelect}
           ttsEnabled={autoListen}
-          onToggleTTS={() => { setAutoListen(!autoListen); if (!autoListen && currentWord) speakWord(currentWord); }}
+          onToggleTTS={() => setAutoListen(!autoListen)}
           translationVisible={showTranslation}
           onToggleTranslation={() => setShowTranslation(!showTranslation)}
           className="mt-8"
