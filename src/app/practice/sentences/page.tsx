@@ -23,6 +23,7 @@ import {
   type PracticeSentence,
 } from '@/lib/typing/sentence-practice';
 import { PracticeResult, PracticeMetrics, PracticeControls, TimeSelector } from '@/components/practice';
+import { saveSession } from '@/lib/utils/save-stats';
 
 type ViewMode = 'category' | 'time' | 'practice' | 'result';
 
@@ -147,13 +148,35 @@ export default function SentencePracticePage() {
       wpmTimerRef.current = null;
     }
 
-    const elapsed = Date.now() - startTimeRef.current;
-    setSessionStats((prev) => ({
-      ...prev,
-      totalTime: elapsed,
-    }));
+    const totalTime = Date.now() - startTimeRef.current;
+
+    // Update stats and save to DB
+    setSessionStats((prev) => {
+      const accuracy = prev.totalCharacters > 0
+        ? (prev.correctCharacters / prev.totalCharacters) * 100
+        : 0;
+      const minutes = totalTime / 60000;
+      const wpm = minutes > 0 ? Math.round((prev.correctCharacters / 5) / minutes) : 0;
+
+      // Save to local store and DB
+      saveSession({
+        type: 'sentences',
+        locale: language,
+        wpm,
+        accuracy,
+        duration: totalTime,
+        charactersTyped: prev.totalCharacters,
+        errorsCount: prev.totalCharacters - prev.correctCharacters,
+      });
+
+      return {
+        ...prev,
+        totalTime,
+      };
+    });
+
     setViewMode('result');
-  }, []);
+  }, [language]);
 
   // 타이머 시작
   useEffect(() => {

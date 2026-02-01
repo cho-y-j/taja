@@ -12,6 +12,7 @@ import { useTTS } from '@/hooks/use-tts';
 import { wordLevels, getRandomWordsWithMeaning, type WordWithMeaning } from '@/lib/typing/word-practice';
 import { useThemeStore } from '@/stores/theme-store';
 import { playErrorSound, playKeySound } from '@/lib/utils/sound';
+import { saveSession } from '@/lib/utils/save-stats';
 
 type Language = 'en' | 'ko';
 type ViewMode = 'level' | 'time' | 'practice' | 'result';
@@ -127,9 +128,32 @@ export default function WordPracticePage() {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     if (wpmTimerRef.current) { clearInterval(wpmTimerRef.current); wpmTimerRef.current = null; }
     stopTTS();
-    setSessionStats(prev => ({ ...prev, totalTime: Date.now() - startTimeRef.current }));
+
+    // Update stats and save to DB
+    setSessionStats(prev => {
+      const totalTime = Date.now() - startTimeRef.current;
+      const accuracy = prev.totalCharacters > 0
+        ? (prev.correctCharacters / prev.totalCharacters) * 100
+        : 0;
+      const minutes = totalTime / 60000;
+      const wpm = minutes > 0 ? Math.round((prev.correctCharacters / 5) / minutes) : 0;
+
+      // Save to local store and DB
+      saveSession({
+        type: 'words',
+        locale: language,
+        wpm,
+        accuracy,
+        duration: totalTime,
+        charactersTyped: prev.totalCharacters,
+        errorsCount: prev.totalCharacters - prev.correctCharacters,
+      });
+
+      return { ...prev, totalTime };
+    });
+
     setViewMode('result');
-  }, [stopTTS]);
+  }, [stopTTS, language]);
 
   // Timer effect
   useEffect(() => {

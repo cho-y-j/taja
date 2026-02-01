@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { extractParagraphs } from '@/lib/documents/document-utils';
 import { playErrorSound, playKeySound } from '@/lib/utils/sound';
+import { saveSession } from '@/lib/utils/save-stats';
 import type { UserDocument } from '@/stores/document-store';
 import { TimeSelector, PracticeControls, PracticeResult } from '@/components/practice';
 import { useTTS } from '@/hooks/use-tts';
@@ -107,9 +108,33 @@ export function FullTextPracticeMode({ document: doc }: Props) {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     if (wpmTimerRef.current) { clearInterval(wpmTimerRef.current); wpmTimerRef.current = null; }
     window.speechSynthesis?.cancel();
-    setSessionStats(prev => ({ ...prev, totalTime: Date.now() - startTimeRef.current }));
+
+    // Update stats and save to DB
+    setSessionStats(prev => {
+      const totalTime = Date.now() - startTimeRef.current;
+      const accuracy = prev.totalCharacters > 0
+        ? (prev.correctCharacters / prev.totalCharacters) * 100
+        : 0;
+      const minutes = totalTime / 60000;
+      const wpm = minutes > 0 ? Math.round((prev.correctCharacters / 5) / minutes) : 0;
+
+      // Save to local store and DB
+      saveSession({
+        type: 'document-fulltext',
+        locale: doc.language,
+        wpm,
+        accuracy,
+        duration: totalTime,
+        charactersTyped: prev.totalCharacters,
+        errorsCount: prev.totalCharacters - prev.correctCharacters,
+        contentId: doc.id,
+      });
+
+      return { ...prev, totalTime };
+    });
+
     setViewMode('result');
-  }, []);
+  }, [doc.language, doc.id]);
 
   // Timer
   useEffect(() => {

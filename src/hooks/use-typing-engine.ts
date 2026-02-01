@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useTypingStore } from '@/stores/typing-store';
-import { useStatsStore } from '@/stores/stats-store';
+import { saveSession } from '@/lib/utils/save-stats';
 import { playErrorSound, playKeySound } from '@/lib/utils/sound';
 import type { CharacterFeedback, PracticeType } from '@/types/typing';
 
 export function useTypingEngine(targetText: string, practiceType: PracticeType) {
   const store = useTypingStore();
-  const addSession = useStatsStore((s) => s.addSession);
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const savedRef = useRef(false);
@@ -21,17 +20,17 @@ export function useTypingEngine(targetText: string, practiceType: PracticeType) 
     }
   }, [targetText, practiceType]);
 
-  // 완료 시 통계 저장
+  // 완료 시 통계 저장 (로컬 + DB)
   useEffect(() => {
     if (store.isComplete && !savedRef.current && store.metrics.totalCharacters > 0) {
       savedRef.current = true;
-      addSession({
-        practiceType,
+      saveSession({
+        type: practiceType,
         wpm: store.metrics.wpm,
         accuracy: store.metrics.accuracy,
         duration: store.metrics.elapsedTime,
-        errorCount: store.metrics.errorCount,
-        totalChars: store.metrics.totalCharacters,
+        charactersTyped: store.metrics.totalCharacters,
+        errorsCount: store.metrics.errorCount,
       });
     }
   }, [store.isComplete]); // eslint-disable-line react-hooks/exhaustive-deps

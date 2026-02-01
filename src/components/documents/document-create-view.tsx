@@ -374,14 +374,42 @@ export function DocumentCreateView() {
       {createSource === 'upload' && !draftContent && (
         <Card className="mb-6">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Upload className="w-5 h-5 text-[var(--color-primary)]" />
-              <span className="font-semibold">파일 업로드</span>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Upload className="w-5 h-5 text-[var(--color-primary)]" />
+                <span className="font-semibold">파일에서 학습자료 만들기</span>
+              </div>
+              {/* 생성 언어 선택 */}
+              <div className="flex items-center gap-1 bg-[var(--color-border)] rounded-lg p-1">
+                <button
+                  onClick={() => setDraft(draftName, draftContent, 'ko')}
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                    draftLanguage === 'ko'
+                      ? 'bg-[var(--color-primary)] text-white'
+                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  한국어
+                </button>
+                <button
+                  onClick={() => setDraft(draftName, draftContent, 'en')}
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                    draftLanguage === 'en'
+                      ? 'bg-[var(--color-primary)] text-white'
+                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  English
+                </button>
+              </div>
             </div>
 
-            {!pendingFileContent ? (
-              // 파일 선택 UI
-              <>
+            <div className="space-y-3">
+              {/* 파일 선택 영역 */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-[var(--color-text)]">
+                  파일 선택
+                </label>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -389,121 +417,107 @@ export function DocumentCreateView() {
                   onChange={handleFileUpload}
                   className="hidden"
                 />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                  className="w-full py-8 border-2 border-dashed border-[var(--color-border)] rounded-xl hover:border-[var(--color-primary)] transition-colors text-center disabled:opacity-50"
-                >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin text-[var(--color-primary)]" />
-                      <p className="text-[var(--color-text-muted)]">파일을 읽고 있습니다...</p>
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-8 h-8 mx-auto mb-2 text-[var(--color-text-muted)]" />
-                      <p className="text-[var(--color-text-muted)]">
-                        클릭하여 파일을 선택하세요
-                      </p>
-                      <p className="text-xs text-[var(--color-text-muted)] mt-1">
-                        .pdf, .txt, .md 지원
-                      </p>
-                    </>
-                  )}
-                </button>
-              </>
-            ) : (
-              // 파일 처리 옵션 UI
-              <div className="space-y-4">
-                {/* 파일 정보 */}
-                <div className="p-4 bg-[var(--color-background)] rounded-lg border border-[var(--color-border)]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-[var(--color-text)]">{pendingFileContent.name}</p>
-                      <p className="text-sm text-[var(--color-text-muted)]">
-                        {pendingFileContent.content.length.toLocaleString()}자
-                      </p>
+                {!pendingFileContent ? (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="w-full py-4 border-2 border-dashed border-[var(--color-border)] rounded-lg hover:border-[var(--color-primary)] transition-colors text-center disabled:opacity-50"
+                  >
+                    {isUploading ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin text-[var(--color-primary)]" />
+                        <span className="text-[var(--color-text-muted)]">파일을 읽고 있습니다...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-2">
+                        <Upload className="w-5 h-5 text-[var(--color-text-muted)]" />
+                        <span className="text-[var(--color-text-muted)]">
+                          클릭하여 파일 선택 (.pdf, .txt, .md)
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                ) : (
+                  <div className="p-3 bg-[var(--color-background)] rounded-lg border border-[var(--color-border)] flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-[var(--color-primary)]/10 flex items-center justify-center">
+                        <Upload className="w-4 h-4 text-[var(--color-primary)]" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-[var(--color-text)] text-sm">{pendingFileContent.name}</p>
+                        <p className="text-xs text-[var(--color-text-muted)]">
+                          {pendingFileContent.content.length.toLocaleString()}자
+                        </p>
+                      </div>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => {
                         setPendingFileContent(null);
-                        setUploadInstruction('');
                       }}
                       disabled={isUploading}
                     >
-                      다른 파일
+                      변경
                     </Button>
                   </div>
+                )}
+              </div>
+
+              {/* AI 지시사항 */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-[var(--color-text)]">
+                  AI 지시사항 (선택)
+                </label>
+                <textarea
+                  value={uploadInstruction}
+                  onChange={(e) => setUploadInstruction(e.target.value)}
+                  placeholder="원하는 방식으로 정리해달라고 요청하세요..."
+                  rows={2}
+                  className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] text-sm"
+                />
+                {/* 예시 지시사항 */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {[
+                    '핵심 단어만 추출해줘',
+                    '주요 문장 위주로 정리해줘',
+                    '초급자용으로 쉽게',
+                  ].map((example) => (
+                    <button
+                      key={example}
+                      type="button"
+                      onClick={() => setUploadInstruction(example)}
+                      className="px-2 py-1 text-xs bg-[var(--color-surface)] border border-[var(--color-border)] rounded-full hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
+                    >
+                      {example}
+                    </button>
+                  ))}
                 </div>
+                <p className="text-xs text-[var(--color-text-muted)] mt-2">
+                  지시사항 없으면 단어 10~15개, 문장 8~12개를 자동 추출 + 번역
+                </p>
+              </div>
 
-                {/* AI 지시사항 */}
-                <div className="p-4 bg-gradient-to-br from-[var(--color-primary)]/5 to-[var(--color-secondary)]/5 rounded-xl border border-[var(--color-primary)]/20">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Bot className="w-5 h-5 text-[var(--color-primary)]" />
-                    <span className="font-semibold text-[var(--color-text)]">AI 학습 자료 생성</span>
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium mb-2 text-[var(--color-text)]">
-                      지시사항 (선택)
-                    </label>
-                    <textarea
-                      value={uploadInstruction}
-                      onChange={(e) => setUploadInstruction(e.target.value)}
-                      placeholder="원하는 방식으로 정리해달라고 요청하세요..."
-                      rows={2}
-                      className="w-full px-4 py-3 border border-[var(--color-border)] rounded-lg bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] text-sm"
-                    />
-                  </div>
-
-                  {/* 예시 지시사항 버튼들 */}
-                  <div className="mb-4">
-                    <p className="text-xs text-[var(--color-text-muted)] mb-2">예시 (클릭하여 적용):</p>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        '핵심 단어와 예문만 추출해줘',
-                        '어려운 단어 위주로 정리해줘',
-                        '문서를 요약하고 주요 문장 뽑아줘',
-                        '초급자용으로 쉬운 표현만 골라줘',
-                      ].map((example) => (
-                        <button
-                          key={example}
-                          type="button"
-                          onClick={() => setUploadInstruction(example)}
-                          className="px-3 py-1.5 text-xs bg-[var(--color-surface)] border border-[var(--color-border)] rounded-full hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
-                        >
-                          {example}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* 기본 동작 안내 */}
-                  <div className="p-3 bg-[var(--color-surface)] rounded-lg text-sm">
-                    <p className="text-[var(--color-text-muted)]">
-                      <span className="font-medium text-[var(--color-text)]">지시사항 없이 실행하면:</span>{' '}
-                      문서에서 중요 단어 10~15개와 핵심 문장 8~12개를 자동 추출하고, 해석(번역)을 함께 생성합니다.
-                    </p>
-                  </div>
-                </div>
-
-                {/* 버튼들 */}
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleProcessFileWithAi}
-                    disabled={isUploading}
-                    className="flex-1"
-                    size="lg"
-                  >
-                    {isUploading ? (
+              {/* 처리 버튼 */}
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleProcessFileWithAi}
+                  disabled={isUploading || !pendingFileContent}
+                  className="flex-1"
+                >
+                  {isUploading ? (
+                    <>
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    ) : (
+                      처리 중...
+                    </>
+                  ) : (
+                    <>
                       <Bot className="w-4 h-4 mr-2" />
-                    )}
-                    {uploadInstruction.trim() ? 'AI로 맞춤 정리' : 'AI로 학습자료 만들기'}
-                  </Button>
+                      {uploadInstruction.trim() ? 'AI로 맞춤 정리' : 'AI로 학습자료 만들기'}
+                    </>
+                  )}
+                </Button>
+                {pendingFileContent && (
                   <Button
                     variant="outline"
                     onClick={handleUseFileAsIs}
@@ -511,9 +525,9 @@ export function DocumentCreateView() {
                   >
                     원본 그대로
                   </Button>
-                </div>
+                )}
               </div>
-            )}
+            </div>
 
             {uploadError && (
               <p className="mt-2 text-sm text-[var(--color-error)]">{uploadError}</p>
