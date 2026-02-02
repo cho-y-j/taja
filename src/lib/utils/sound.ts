@@ -10,11 +10,36 @@ function getAudioContext(): AudioContext | null {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
   }
+  // Resume if suspended (browser autoplay policy)
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
   return audioCtx;
+}
+
+// 설정 스토어에서 값을 가져오는 헬퍼
+function getSettings(): { keySound: boolean; errorSound: boolean } {
+  if (typeof window === 'undefined') return { keySound: true, errorSound: true };
+  try {
+    const stored = localStorage.getItem('taja-settings');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return {
+        keySound: parsed.state?.keySound ?? true,
+        errorSound: parsed.state?.errorSound ?? true,
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return { keySound: true, errorSound: true };
 }
 
 /** Short error buzz (low tone, ~80ms) */
 export function playErrorSound(): void {
+  const settings = getSettings();
+  if (!settings.errorSound) return;
+
   const ctx = getAudioContext();
   if (!ctx) return;
 
@@ -36,6 +61,9 @@ export function playErrorSound(): void {
 
 /** Soft key click (high tone, ~30ms) */
 export function playKeySound(): void {
+  const settings = getSettings();
+  if (!settings.keySound) return;
+
   const ctx = getAudioContext();
   if (!ctx) return;
 
