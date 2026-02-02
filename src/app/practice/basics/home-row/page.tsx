@@ -202,7 +202,7 @@ export default function KeyboardPracticePage() {
   }, [reset]);
 
   const handleExit = useCallback(() => {
-    router.push('/');
+    router.push('/learn/basic');
   }, [router]);
 
   // 스토어 언어가 변경되면 로컬 상태도 동기화
@@ -255,7 +255,7 @@ export default function KeyboardPracticePage() {
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <Link href="/">
+                <Link href="/learn/basic">
                   <Button variant="ghost" size="icon">
                     <ArrowLeft className="w-5 h-5" />
                   </Button>

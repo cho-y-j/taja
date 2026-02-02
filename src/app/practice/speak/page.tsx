@@ -251,7 +251,7 @@ export default function SpeakPracticePage() {
   // 종료
   const handleExit = useCallback(() => {
     stopListening();
-    router.push('/');
+    router.push('/learn/basic');
   }, [router, stopListening]);
 
   // 스토어 언어가 변경되면 로컬 상태도 동기화
@@ -304,7 +304,7 @@ export default function SpeakPracticePage() {
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <Link href="/">
+                <Link href="/learn/basic">
                   <Button variant="ghost" size="icon">
                     <ArrowLeft className="w-5 h-5" />
                   </Button>
